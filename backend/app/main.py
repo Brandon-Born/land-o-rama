@@ -6,61 +6,83 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
+from sqlalchemy.exc import OperationalError
 
 from app.api.routes import router as api_router
 from app.core.config import get_settings
-from app.db.session import SessionLocal, engine
-from app.models import Base, SyncRun
+from app.db.session import SessionLocal
+from app.models import SyncRun
 from app.services.pipeline import run_daily_pipeline
 from app.services.settings import ensure_default_settings
 
-settings = get_settings()
-scheduler = BackgroundScheduler()
 
+def create_app(
+    *,
+    enable_startup_tasks: bool = True,
+    enable_scheduler: bool = True,
+    bootstrap_pipeline: bool = True,
+) -> FastAPI:
+    settings = get_settings()
+    scheduler = BackgroundScheduler()
 
-def _schedule_daily_job() -> None:
-    refresh_time = settings.refresh_time
-    hour, minute = [int(part) for part in refresh_time.split(":", maxsplit=1)]
-    scheduler.add_job(
-        _run_job_wrapper,
-        trigger="cron",
-        hour=hour,
-        minute=minute,
-        id="daily_pipeline",
-        replace_existing=True,
-    )
-    scheduler.start()
-
-
-def _run_job_wrapper() -> None:
-    with SessionLocal() as db:
-        run_daily_pipeline(db)
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):  # noqa: ARG001
-    Base.metadata.create_all(bind=engine)
-    with SessionLocal() as db:
-        ensure_default_settings(db)
-        existing_run = db.scalar(select(SyncRun.id).where(SyncRun.status == "success").limit(1))
-        if not existing_run:
+    def _run_job_wrapper() -> None:
+        with SessionLocal() as db:
             run_daily_pipeline(db)
-    _schedule_daily_job()
-    yield
-    scheduler.shutdown(wait=False)
+
+    def _schedule_daily_job() -> None:
+        refresh_time = settings.refresh_time
+        hour, minute = [int(part) for part in refresh_time.split(":", maxsplit=1)]
+        scheduler.add_job(
+            _run_job_wrapper,
+            trigger="cron",
+            hour=hour,
+            minute=minute,
+            id="daily_pipeline",
+            replace_existing=True,
+        )
+        scheduler.start()
+
+    @asynccontextmanager
+    async def lifespan(_: FastAPI):
+        with SessionLocal() as db:
+            try:
+                ensure_default_settings(db)
+            except OperationalError as exc:  # pragma: no cover - startup guardrail
+                raise RuntimeError(
+                    "Database schema is not initialized. Run `alembic upgrade head` in /backend first."
+                ) from exc
+
+            if bootstrap_pipeline:
+                existing_run = db.scalar(
+                    select(SyncRun.id).where(SyncRun.status.in_(["success", "degraded"])).limit(1)
+                )
+                if not existing_run:
+                    run_daily_pipeline(db)
+        if enable_scheduler:
+            _schedule_daily_job()
+        yield
+        if enable_scheduler and scheduler.running:
+            scheduler.shutdown(wait=False)
+
+    app = FastAPI(
+        title=settings.app_name,
+        lifespan=lifespan if enable_startup_tasks else None,
+    )
+    app.state.scheduler_enabled = enable_scheduler and enable_startup_tasks
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origin_list,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    app.include_router(api_router)
+
+    @app.get("/health")
+    def health() -> dict[str, str]:
+        return {"status": "ok"}
+
+    return app
 
 
-app = FastAPI(title=settings.app_name, lifespan=lifespan)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_origin_list,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-app.include_router(api_router)
-
-
-@app.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok"}
+app = create_app()

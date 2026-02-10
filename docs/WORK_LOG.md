@@ -109,3 +109,61 @@
   - Add API integration tests for run/digest/feedback flows to reduce reliance on manual smoke checks.
   - Implement real provider adapters (RapidAPI listings + Regrid enrichment) behind existing mock/live boundaries.
   - Add initial migration tooling (Alembic) so schema changes are tracked explicitly.
+
+## 2026-02-10 - Integration Tests + Alembic + Live Provider Enablement Sprint
+- Task summary:
+  - Added deterministic API integration test framework with per-test SQLite DBs and dependency overrides.
+  - Implemented endpoint integration tests for runs, opportunities, digests, and feedback.
+  - Added provider behavior tests for degraded/failure semantics and RapidAPI retry behavior.
+  - Introduced Alembic migration tooling with baseline schema migration and switched runtime to migration-first lifecycle.
+  - Removed `create_all` startup behavior and added explicit startup guard when migrations are missing.
+  - Added live-provider abstraction layer (RapidAPI listings, Regrid enrichment) with mock fallback orchestration.
+  - Implemented degraded run semantics, provider run diagnostics, and extended runs/settings API payloads.
+  - Updated frontend to display provider configuration/health and provider event statuses for runs.
+- Files changed:
+  - `/Users/bborn/land-o-rama/Makefile`
+  - `/Users/bborn/land-o-rama/README.md`
+  - `/Users/bborn/land-o-rama/backend/requirements.txt`
+  - `/Users/bborn/land-o-rama/backend/.env.example`
+  - `/Users/bborn/land-o-rama/backend/alembic.ini`
+  - `/Users/bborn/land-o-rama/backend/alembic/env.py`
+  - `/Users/bborn/land-o-rama/backend/alembic/script.py.mako`
+  - `/Users/bborn/land-o-rama/backend/alembic/versions/0001_initial_schema.py`
+  - `/Users/bborn/land-o-rama/backend/app/main.py`
+  - `/Users/bborn/land-o-rama/backend/app/core/config.py`
+  - `/Users/bborn/land-o-rama/backend/app/models/entities.py`
+  - `/Users/bborn/land-o-rama/backend/app/models/__init__.py`
+  - `/Users/bborn/land-o-rama/backend/app/providers/__init__.py`
+  - `/Users/bborn/land-o-rama/backend/app/providers/health.py`
+  - `/Users/bborn/land-o-rama/backend/app/providers/listings.py`
+  - `/Users/bborn/land-o-rama/backend/app/providers/enrichment.py`
+  - `/Users/bborn/land-o-rama/backend/app/providers/rapidapi_listings.py`
+  - `/Users/bborn/land-o-rama/backend/app/providers/regrid_enrichment.py`
+  - `/Users/bborn/land-o-rama/backend/app/services/pipeline.py`
+  - `/Users/bborn/land-o-rama/backend/app/services/settings.py`
+  - `/Users/bborn/land-o-rama/backend/app/schemas/api.py`
+  - `/Users/bborn/land-o-rama/backend/app/api/routes.py`
+  - `/Users/bborn/land-o-rama/backend/tests/conftest.py`
+  - `/Users/bborn/land-o-rama/backend/tests/test_api_runs.py`
+  - `/Users/bborn/land-o-rama/backend/tests/test_api_opportunities.py`
+  - `/Users/bborn/land-o-rama/backend/tests/test_api_digests.py`
+  - `/Users/bborn/land-o-rama/backend/tests/test_api_feedback.py`
+  - `/Users/bborn/land-o-rama/backend/tests/test_provider_pipeline.py`
+  - `/Users/bborn/land-o-rama/backend/tests/test_migrations.py`
+  - `/Users/bborn/land-o-rama/frontend/src/types.ts`
+  - `/Users/bborn/land-o-rama/frontend/src/App.tsx`
+  - `/Users/bborn/land-o-rama/frontend/src/styles.css`
+  - `/Users/bborn/land-o-rama/docs/API_SPEC.md`
+  - `/Users/bborn/land-o-rama/docs/ARCHITECTURE.md`
+  - `/Users/bborn/land-o-rama/docs/WORK_LOG.md`
+- Validation performed:
+  - `cd /Users/bborn/land-o-rama/backend && . .venv/bin/activate && pip install -r requirements.txt --cache-dir /tmp/pip-cache` passed.
+  - `cd /Users/bborn/land-o-rama/backend && . .venv/bin/activate && pytest -q` passed (`18 passed`).
+  - `cd /Users/bborn/land-o-rama && make test-api` passed (`8 passed`).
+  - `cd /Users/bborn/land-o-rama/frontend && npm run build` passed.
+  - `cd /Users/bborn/land-o-rama/backend && . .venv/bin/activate && alembic upgrade head` passed on clean local DB.
+  - FastAPI startup check after migration via `TestClient(create_app(...enable_startup_tasks=True))` passed.
+- Next recommended tasks:
+  - Implement real market metrics provider(s) to replace mock macro metrics in live mode.
+  - Add UI filter controls (county, min score, max price) and pagination controls wired to query params.
+  - Add frontend tests (critical flows + provider health rendering) to mirror backend integration coverage.

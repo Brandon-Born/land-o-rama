@@ -123,6 +123,67 @@ button.primary {
   border-color: #172023;
 }
 
+.provider-strip {
+  margin-top: 1rem;
+}
+
+.provider-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  margin-bottom: 0.75rem;
+  color: #445057;
+}
+
+.provider-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.provider-list li {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid #e4eaee;
+  border-radius: 10px;
+  padding: 0.55rem 0.7rem;
+  background: #fff;
+}
+
+.provider-list em {
+  grid-column: 1 / -1;
+  font-style: normal;
+  color: #822129;
+}
+
+.pill-success,
+.pill-degraded,
+.pill-failed {
+  border-radius: 999px;
+  padding: 0.2rem 0.45rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.pill-success {
+  background: #daf3e8;
+  color: #0f624b;
+}
+
+.pill-degraded {
+  background: #faefc8;
+  color: #7a5d10;
+}
+
+.pill-failed {
+  background: #ffd9dc;
+  color: #92232b;
+}
+
 .dashboard-grid {
   margin-top: 1rem;
   display: grid;

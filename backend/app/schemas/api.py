@@ -74,6 +74,13 @@ class DigestsResponse(BaseModel):
     items: list[DigestSummary]
 
 
+class ProviderEventStatus(BaseModel):
+    provider: str
+    status: str
+    error_summary: str | None
+    created_at: datetime
+
+
 class RunStatus(BaseModel):
     id: str
     run_type: str
@@ -85,6 +92,7 @@ class RunStatus(BaseModel):
     candidates_scored: int
     excluded_count: int
     error_summary: str | None
+    provider_events: list[ProviderEventStatus] = Field(default_factory=list)
 
 
 class RunsResponse(BaseModel):
@@ -101,6 +109,12 @@ class SettingsResponse(BaseModel):
     refresh_time: str
     mock_mode: bool
     disclaimers_enabled: bool = Field(default=True)
+    rapidapi_configured: bool = False
+    regrid_configured: bool = False
+    rapidapi_provider_slug: str = "land-listings"
+    provider_timeout_seconds: float = 12.0
+    provider_max_retries: int = 2
+    provider_health: list[ProviderEventStatus] = Field(default_factory=list)
 
 
 class SettingsUpdate(BaseModel):

@@ -14,6 +14,7 @@ import type {
   DigestSummary,
   OpportunityDetail,
   OpportunityListItem,
+  ProviderEventStatus,
   RunStatus,
   SettingsResponse,
 } from "./types";
@@ -77,6 +78,8 @@ export default function App() {
     const under4k = opportunities.filter((item) => item.price < 4000).length;
     return { total, avgScore, under4k };
   }, [opportunities]);
+
+  const providerHealth = useMemo(() => settings?.provider_health ?? [], [settings]);
 
   async function selectOpportunity(id: string) {
     try {
@@ -154,6 +157,29 @@ export default function App() {
               <span>Mode</span>
               <strong>{settings?.mock_mode ? "Mock" : "Live"}</strong>
             </article>
+          </section>
+
+          <section className="provider-strip card">
+            <h2>Provider Health</h2>
+            <div className="provider-meta">
+              <span>RapidAPI: {settings?.rapidapi_configured ? "Configured" : "Missing Key/Host"}</span>
+              <span>Regrid: {settings?.regrid_configured ? "Configured" : "Missing Key"}</span>
+              <span>Slug: {settings?.rapidapi_provider_slug ?? "n/a"}</span>
+            </div>
+            {providerHealth.length === 0 ? (
+              <p>No provider events yet.</p>
+            ) : (
+              <ul className="provider-list">
+                {providerHealth.map((event: ProviderEventStatus) => (
+                  <li key={`${event.provider}-${event.created_at}`}>
+                    <strong>{event.provider}</strong>
+                    <span className={`pill-${event.status}`}>{event.status}</span>
+                    <small>{new Date(event.created_at).toLocaleString()}</small>
+                    {event.error_summary && <em>{event.error_summary}</em>}
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
 
           <nav className="tabs">
@@ -277,6 +303,14 @@ export default function App() {
                       Listings: {run.listings_ingested}, Auctions: {run.auctions_ingested}, Scored:{" "}
                       {run.candidates_scored}, Excluded: {run.excluded_count}
                     </small>
+                    {run.provider_events.length > 0 && (
+                      <small>
+                        Providers:{" "}
+                        {run.provider_events
+                          .map((event) => `${event.provider}:${event.status}`)
+                          .join(" | ")}
+                      </small>
+                    )}
                   </li>
                 ))}
               </ul>

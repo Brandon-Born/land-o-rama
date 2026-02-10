@@ -8,6 +8,7 @@ from statistics import median
 from sqlalchemy import delete, desc, select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.models import (
     AuctionRaw,
     Digest,
@@ -16,26 +17,112 @@ from app.models import (
     MarketMetricDaily,
     Opportunity,
     Parcel,
+    ProviderRunEvent,
     RiskFlag,
     SyncRun,
 )
+from app.providers.enrichment import ParcelEnrichmentProvider, build_enrichment_provider
+from app.providers.listings import ListingProvider, build_listing_provider
 from app.providers.mock_data import CandidateRecord, CountyMetric, mock_candidates, mock_market_metrics
 from app.scoring.engine import score_candidate
 from app.services.settings import read_settings
 
 
-def run_daily_pipeline(db: Session) -> SyncRun:
+def run_daily_pipeline(
+    db: Session,
+    *,
+    listing_provider: ListingProvider | None = None,
+    enrichment_provider: ParcelEnrichmentProvider | None = None,
+) -> SyncRun:
     settings = read_settings(db)
+    runtime = get_settings()
     run = SyncRun(run_type="daily", status="running")
     db.add(run)
     db.commit()
     db.refresh(run)
 
+    degraded = False
+
     try:
-        candidates = mock_candidates(settings.state)
-        metrics = mock_market_metrics(date.today(), settings.state)
-        metric_map = {metric.county: metric for metric in metrics}
-        _persist_metrics(db, metrics)
+        candidates: list[CandidateRecord] = []
+        market_metrics = mock_market_metrics(date.today(), settings.state)
+        _record_provider_event(db, run.id, provider="market_metrics", status="success")
+
+        if settings.mock_mode:
+            candidates = mock_candidates(settings.state)
+            _record_provider_event(db, run.id, provider="mock_listings", status="success")
+            _record_provider_event(db, run.id, provider="mock_auctions", status="success")
+        else:
+            live_listing_provider = listing_provider or build_listing_provider(runtime)
+            live_enrichment_provider = enrichment_provider or build_enrichment_provider(runtime)
+
+            live_listings, listings_error = _fetch_live_listings(
+                live_listing_provider,
+                state=settings.state,
+                max_price=6000.0,
+            )
+            if listings_error:
+                degraded = True
+                _record_provider_event(
+                    db,
+                    run.id,
+                    provider=live_listing_provider.provider_name,
+                    status="failed",
+                    error_summary=listings_error,
+                )
+                # Keep app productive with mock listing fallback when live feed is unavailable.
+                live_listings = [
+                    candidate
+                    for candidate in mock_candidates(settings.state)
+                    if candidate.source_type == "listing" and candidate.price <= 6000
+                ]
+                _record_provider_event(
+                    db,
+                    run.id,
+                    provider="mock_listing_fallback",
+                    status="degraded",
+                    error_summary="RapidAPI unavailable, used mock listing fallback.",
+                )
+            else:
+                _record_provider_event(
+                    db,
+                    run.id,
+                    provider=live_listing_provider.provider_name,
+                    status="success",
+                )
+
+            enriched_listings, enrichment_error = _enrich_listings(live_enrichment_provider, live_listings)
+            if enrichment_error:
+                degraded = True
+                _record_provider_event(
+                    db,
+                    run.id,
+                    provider=live_enrichment_provider.provider_name,
+                    status="degraded",
+                    error_summary=enrichment_error,
+                )
+            else:
+                _record_provider_event(
+                    db,
+                    run.id,
+                    provider=live_enrichment_provider.provider_name,
+                    status="success",
+                )
+
+            auction_candidates = [
+                candidate
+                for candidate in mock_candidates(settings.state)
+                if candidate.source_type == "auction"
+            ]
+            _record_provider_event(db, run.id, provider="mock_auctions", status="success")
+
+            candidates = enriched_listings + auction_candidates
+
+        if not candidates:
+            raise RuntimeError("No candidates available from live or fallback providers.")
+
+        metric_map = {metric.county: metric for metric in market_metrics}
+        _persist_metrics(db, market_metrics)
 
         run.listings_ingested = _persist_raw_records(db, candidates, source_type="listing")
         run.auctions_ingested = _persist_raw_records(db, candidates, source_type="auction")
@@ -93,7 +180,7 @@ def run_daily_pipeline(db: Session) -> SyncRun:
 
         run.candidates_scored = scored_count
         run.excluded_count = excluded_count
-        run.status = "success"
+        run.status = "degraded" if degraded else "success"
         run.finished_at = datetime.now(UTC)
         db.commit()
 
@@ -104,6 +191,8 @@ def run_daily_pipeline(db: Session) -> SyncRun:
         run.status = "failed"
         run.error_summary = str(exc)
         run.finished_at = datetime.now(UTC)
+        db.commit()
+        _record_provider_event(db, run.id, provider="pipeline", status="failed", error_summary=str(exc))
         db.commit()
         raise
 
@@ -122,11 +211,44 @@ def purge_old_data(db: Session, months: int = 24) -> None:
 def latest_successful_run_id(db: Session) -> str | None:
     stmt = (
         select(SyncRun.id)
-        .where(SyncRun.status == "success")
+        .where(SyncRun.status.in_(["success", "degraded"]))
         .order_by(desc(SyncRun.started_at))
         .limit(1)
     )
     return db.scalar(stmt)
+
+
+def _fetch_live_listings(
+    provider: ListingProvider,
+    *,
+    state: str,
+    max_price: float,
+) -> tuple[list[CandidateRecord], str | None]:
+    try:
+        listings = provider.fetch(state=state, max_price=max_price)
+        return listings, None
+    except Exception as exc:  # noqa: BLE001
+        return [], str(exc)
+
+
+def _enrich_listings(
+    provider: ParcelEnrichmentProvider,
+    listings: list[CandidateRecord],
+) -> tuple[list[CandidateRecord], str | None]:
+    if not listings:
+        return [], None
+
+    enriched: list[CandidateRecord] = []
+    first_error: str | None = None
+    for listing in listings:
+        try:
+            enriched.append(provider.enrich(listing))
+        except Exception as exc:  # noqa: BLE001
+            # Keep listing and continue so one enrichment failure does not block the run.
+            enriched.append(listing)
+            if first_error is None:
+                first_error = str(exc)
+    return enriched, first_error
 
 
 def _persist_metrics(db: Session, metrics: list[CountyMetric]) -> None:
@@ -260,7 +382,7 @@ def _compute_price_per_acre_benchmarks(candidates: list[CandidateRecord]) -> dic
     by_county: dict[str, list[float]] = defaultdict(list)
     for candidate in candidates:
         by_county[candidate.county].append(candidate.price_per_acre)
-    return {county: median(values) for county, values in by_county.items()}
+    return {county: median(values) for county, values in by_county.items() if values}
 
 
 def _fallback_metric(candidate: CandidateRecord) -> CountyMetric:
@@ -295,10 +417,16 @@ def _create_daily_digest(db: Session, run_id: str) -> None:
         selected.extend(remainder[: 20 - len(selected)])
     selected = selected[:20]
 
-    summary = (
-        f"{len(selected)} opportunities surfaced from run {run_id}. "
-        "Scores combine growth, development pressure, accessibility, liquidity, and risk burden."
-    )
+    if selected:
+        summary = (
+            f"{len(selected)} opportunities surfaced from run {run_id}. "
+            "Scores combine growth, development pressure, accessibility, liquidity, and risk burden."
+        )
+    else:
+        summary = (
+            f"No qualifying opportunities found for run {run_id}. "
+            "All candidates were excluded or above configured thresholds."
+        )
 
     db.add(
         Digest(
@@ -306,3 +434,22 @@ def _create_daily_digest(db: Session, run_id: str) -> None:
             opportunity_ids=[opportunity.id for opportunity in selected],
         )
     )
+
+
+def _record_provider_event(
+    db: Session,
+    run_id: str,
+    *,
+    provider: str,
+    status: str,
+    error_summary: str | None = None,
+) -> None:
+    db.add(
+        ProviderRunEvent(
+            run_id=run_id,
+            provider=provider,
+            status=status,
+            error_summary=error_summary,
+        )
+    )
+    db.flush()

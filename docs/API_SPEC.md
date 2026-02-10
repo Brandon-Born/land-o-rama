@@ -53,30 +53,44 @@ Triggers manual run of daily pipeline.
 
 Response:
 - `run_id: string`
-- `status: "queued" | "running"`
+- `status: "success" | "degraded" | "failed"`
 
 ### `GET /runs`
 Returns ETL run history and statuses.
 
+Run status values:
+- `running`
+- `success`
+- `degraded`
+- `failed`
+
 ### `GET /settings`
 Returns non-secret runtime settings and provider health.
+
+Provider settings/health fields:
+- `rapidapi_configured: boolean`
+- `regrid_configured: boolean`
+- `rapidapi_provider_slug: string`
+- `provider_timeout_seconds: number`
+- `provider_max_retries: number`
+- `provider_health: ProviderEventStatus[]`
 
 ### `PUT /settings`
 Updates non-secret runtime settings (schedule time, provider toggles).
 
 ## Core Types
 - `OpportunityListItem`
-  - `id`, `title`, `county`, `price`, `acres`, `final_score`, `is_excluded`, `created_at`
+  - `id`, `county`, `state`, `price`, `acreage`, `final_score`, `base_score`, `source_type`, `created_at`
 - `OpportunityDetail`
-  - `id`, `parcel_id`, `coordinates`, `zoning`, `access_type`, `utilities_hint`, `listing_summary`
+  - `id`, `parcel_id`, `county`, `state`, `price`, `acreage`, `source_type`, `source_id`, `is_excluded`, `reason_codes`, `caution_code`, `score_breakdown`, `created_at`
 - `ScoreBreakdown`
   - `market_growth_score`, `development_pressure_score`, `accessibility_score`, `liquidity_score`, `risk_penalty_score`, `base_score`, `final_score`
 - `ReasonCode`
   - `code`, `label`, `direction` (`positive` or `caution`), `impact`
-- `RiskFlag`
-  - `flag`, `severity`, `is_exclusionary`
-- `SourceAttribution`
-  - `source_name`, `as_of`, `confidence`
+- `RunStatus`
+  - `id`, `run_type`, `status`, `started_at`, `finished_at`, `listings_ingested`, `auctions_ingested`, `candidates_scored`, `excluded_count`, `error_summary`, `provider_events`
+- `ProviderEventStatus`
+  - `provider`, `status`, `error_summary`, `created_at`
 
 ## Error Contract
 Consistent error envelope:

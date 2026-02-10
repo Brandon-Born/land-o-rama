@@ -10,8 +10,8 @@ Land-O-Rama is a local-first web application with:
 ## High-Level Components
 - `Provider Adapters`
   - Listings adapter (RapidAPI in live mode, fixtures in mock mode).
-  - Auctions adapter (county/tax feeds in live mode, fixtures in mock mode).
-  - Parcel enrichment adapter (Regrid in live mode).
+  - Auctions adapter (mock in current sprint; live county/tax feeds deferred).
+  - Parcel enrichment adapter (Regrid in live mode, noop in mock mode).
   - Trend metrics adapter (public macro datasets).
 - `Normalization + Dedupe`
   - Converts source payloads into canonical entities.
@@ -41,6 +41,7 @@ Land-O-Rama is a local-first web application with:
 
 ## Storage Model
 - Local DB file: `/Users/bborn/land-o-rama/data/landorama.db`.
+- Schema lifecycle managed by Alembic migrations (`alembic upgrade head`).
 - WAL mode enabled for better local concurrency.
 - 24-month retention policy for historical records.
 - Provider raw payloads retained for audit/debug within retention window.

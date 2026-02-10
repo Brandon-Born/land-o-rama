@@ -105,6 +105,7 @@ class SyncRun(Base):
     error_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     opportunities: Mapped[list["Opportunity"]] = relationship(back_populates="run")
+    provider_events: Mapped[list["ProviderRunEvent"]] = relationship(back_populates="run")
 
 
 class Opportunity(Base):
@@ -168,3 +169,16 @@ class ConfigKV(Base):
     key: Mapped[str] = mapped_column(String(64), primary_key=True)
     value: Mapped[str] = mapped_column(Text)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class ProviderRunEvent(Base):
+    __tablename__ = "provider_run_events"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    run_id: Mapped[str] = mapped_column(ForeignKey("sync_runs.id"), index=True)
+    provider: Mapped[str] = mapped_column(String(64), index=True)
+    status: Mapped[str] = mapped_column(String(32), index=True)
+    error_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+    run: Mapped[SyncRun] = relationship(back_populates="provider_events")

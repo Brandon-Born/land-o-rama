@@ -1,5 +1,5 @@
 backend-install:
-	cd backend && python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
+	cd backend && /opt/homebrew/bin/python3.13 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
 
 backend-dev:
 	cd backend && . .venv/bin/activate && uvicorn app.main:app --reload --port 8000
@@ -12,3 +12,12 @@ frontend-dev:
 
 test:
 	cd backend && . .venv/bin/activate && pytest -q
+
+test-api:
+	cd backend && . .venv/bin/activate && pytest -q tests/test_api_*.py
+
+db-upgrade:
+	cd backend && . .venv/bin/activate && alembic upgrade head
+
+db-revision:
+	cd backend && . .venv/bin/activate && alembic revision -m "$(MSG)"

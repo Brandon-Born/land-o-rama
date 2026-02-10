@@ -16,6 +16,12 @@ class Settings(BaseSettings):
     default_state: str = "TX"
     refresh_time: str = "08:00"
     mock_mode: bool = True
+    rapidapi_key: str | None = None
+    rapidapi_host: str | None = None
+    rapidapi_provider_slug: str = "land-listings"
+    regrid_api_key: str | None = None
+    provider_timeout_seconds: float = 12.0
+    provider_max_retries: int = 2
 
     @field_validator("default_state")
     @classmethod

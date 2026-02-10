@@ -32,10 +32,19 @@ cd /Users/bborn/land-o-rama/backend
 source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
+alembic upgrade head
 uvicorn app.main:app --reload --port 8000
 ```
 
 Note: Python `3.13` is required for the current dependency set. Python `3.14` will fail when building `pydantic-core`.
+
+If you previously ran the app before Alembic adoption, recreate your local DB for clean parity:
+```bash
+rm -f /Users/bborn/land-o-rama/data/landorama.db*
+cd /Users/bborn/land-o-rama/backend
+source .venv/bin/activate
+alembic upgrade head
+```
 
 ### 2) Frontend
 ```bash
@@ -45,6 +54,11 @@ npm run dev
 ```
 
 Open: `http://localhost:5173`
+
+## Database Migrations
+From `/Users/bborn/land-o-rama`:
+- `make db-upgrade`
+- `make db-revision MSG="your migration message"`
 
 ## Key API Endpoints
 - `GET /health`

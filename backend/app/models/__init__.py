@@ -9,6 +9,7 @@ from app.models.entities import (
     MarketMetricDaily,
     Opportunity,
     Parcel,
+    ProviderRunEvent,
     RiskFlag,
     SyncRun,
 )
@@ -24,6 +25,7 @@ __all__ = [
     "MarketMetricDaily",
     "Opportunity",
     "Parcel",
+    "ProviderRunEvent",
     "RiskFlag",
     "SyncRun",
 ]

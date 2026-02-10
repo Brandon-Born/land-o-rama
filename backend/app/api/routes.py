@@ -7,7 +7,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.models import Digest, FeatureVector, Feedback, Opportunity, SyncRun
+from app.models import Digest, FeatureVector, Feedback, Opportunity, ProviderRunEvent, SyncRun
 from app.schemas.api import (
     DigestSummary,
     DigestsResponse,
@@ -20,6 +20,7 @@ from app.schemas.api import (
     RunsResponse,
     RunStatus,
     ScoreBreakdown,
+    ProviderEventStatus,
     SettingsResponse,
     SettingsUpdate,
 )
@@ -179,6 +180,19 @@ def run_daily(db: Session = Depends(get_db)) -> RunNowResponse:
 @router.get("/runs", response_model=RunsResponse)
 def list_runs(db: Session = Depends(get_db)) -> RunsResponse:
     runs = db.scalars(select(SyncRun).order_by(desc(SyncRun.started_at)).limit(50)).all()
+    run_ids = [run.id for run in runs]
+    events_by_run: dict[str, list[ProviderRunEvent]] = {run_id: [] for run_id in run_ids}
+    if run_ids:
+        events = db.scalars(
+            select(ProviderRunEvent)
+            .where(ProviderRunEvent.run_id.in_(run_ids))
+            .order_by(ProviderRunEvent.created_at.desc())
+        ).all()
+        for event in events:
+            bucket = events_by_run.get(event.run_id)
+            if bucket is not None and len(bucket) < 6:
+                bucket.append(event)
+
     return RunsResponse(
         items=[
             RunStatus(
@@ -192,6 +206,15 @@ def list_runs(db: Session = Depends(get_db)) -> RunsResponse:
                 candidates_scored=run.candidates_scored,
                 excluded_count=run.excluded_count,
                 error_summary=run.error_summary,
+                provider_events=[
+                    ProviderEventStatus(
+                        provider=event.provider,
+                        status=event.status,
+                        error_summary=event.error_summary,
+                        created_at=event.created_at,
+                    )
+                    for event in events_by_run.get(run.id, [])
+                ],
             )
             for run in runs
         ]

@@ -57,6 +57,7 @@ export type DigestsResponse = {
 };
 
 export type RunStatus = {
+  provider_events: ProviderEventStatus[];
   id: string;
   run_type: string;
   status: string;
@@ -78,4 +79,17 @@ export type SettingsResponse = {
   refresh_time: string;
   mock_mode: boolean;
   disclaimers_enabled: boolean;
+  rapidapi_configured: boolean;
+  regrid_configured: boolean;
+  rapidapi_provider_slug: string;
+  provider_timeout_seconds: number;
+  provider_max_retries: number;
+  provider_health: ProviderEventStatus[];
+};
+
+export type ProviderEventStatus = {
+  provider: string;
+  status: string;
+  error_summary: string | null;
+  created_at: string;
 };
