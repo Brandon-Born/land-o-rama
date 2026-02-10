@@ -92,7 +92,7 @@ Updates non-secret runtime settings (schedule time, provider toggles).
 - `OpportunityListItem`
   - `id`, `county`, `state`, `price`, `acreage`, `final_score`, `base_score`, `source_type`, `created_at`
 - `OpportunityDetail`
-  - `id`, `parcel_id`, `county`, `state`, `price`, `acreage`, `source_type`, `source_id`, `is_excluded`, `reason_codes`, `caution_code`, `model_version`, `blend_weight`, `score_breakdown`, `created_at`
+  - `id`, `parcel_id`, `county`, `state`, `price`, `acreage`, `source_type`, `source_id`, `source_name`, `source_url`, `is_excluded`, `reason_codes`, `caution_code`, `model_version`, `blend_weight`, `score_breakdown`, `created_at`
 - `ScoreBreakdown`
   - `market_growth_score`, `development_pressure_score`, `accessibility_score`, `liquidity_score`, `risk_penalty_score`, `base_score`, `final_score`, `personalization_score`
 - `ReasonCode`

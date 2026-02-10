@@ -38,6 +38,8 @@ class OpportunityDetail(BaseModel):
     acreage: float
     source_type: str
     source_id: str
+    source_name: str | None = None
+    source_url: str | None = None
     is_excluded: bool
     exclusion_reason: str | None
     reason_codes: list[dict]

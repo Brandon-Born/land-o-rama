@@ -38,6 +38,8 @@ export type OpportunityDetail = {
   acreage: number;
   source_type: string;
   source_id: string;
+  source_name: string | null;
+  source_url: string | null;
   is_excluded: boolean;
   exclusion_reason: string | null;
   reason_codes: Array<{ code: string; label: string; direction: string; impact: number }>;

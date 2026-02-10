@@ -80,6 +80,20 @@ class RapidAPIListingProvider:
             return None
 
         parcel_key = str(item.get("parcel_id") or item.get("apn") or f"{state}-{county}-{external_id}")
+        source_name = str(
+            item.get("source_name")
+            or item.get("provider")
+            or item.get("site_name")
+            or item.get("marketplace")
+            or "RapidAPI Listing Feed"
+        )
+        source_url = _first_text(
+            item.get("url"),
+            item.get("listing_url"),
+            item.get("permalink"),
+            item.get("property_url"),
+            item.get("detail_url"),
+        )
         candidate = CandidateRecord(
             source_type="listing",
             source=self.provider_name,
@@ -99,6 +113,8 @@ class RapidAPIListingProvider:
             road_distance_miles=_as_float(item.get("road_distance_miles") or 1.0),
             days_on_market=int(_as_float(item.get("days_on_market") or 30)),
             price_per_acre=_as_float(item.get("price_per_acre") or (price / acreage)),
+            source_name=source_name,
+            source_url=source_url,
         )
         return replace(candidate, county=candidate.county.title())
 
@@ -115,3 +131,13 @@ def _as_float(value: Any) -> float:
         return float(text)
     except ValueError:
         return 0.0
+
+
+def _first_text(*values: Any) -> str | None:
+    for value in values:
+        if value is None:
+            continue
+        text = str(value).strip()
+        if text:
+            return text
+    return None

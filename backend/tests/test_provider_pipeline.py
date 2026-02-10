@@ -381,6 +381,56 @@ def test_rapidapi_metrics_parses_list_payload(monkeypatch) -> None:
     assert metrics[0].jobs_growth_1y == pytest.approx(1.9)
 
 
+def test_rapidapi_listings_parses_source_destination(monkeypatch) -> None:
+    provider = RapidAPIListingProvider(
+        api_key="key",
+        host="example.test",
+        provider_slug="listing-feed",
+        timeout_seconds=1.0,
+        max_retries=1,
+    )
+
+    class DummyResponse:
+        def raise_for_status(self) -> None:
+            return
+
+        def json(self):
+            return {
+                "results": [
+                    {
+                        "id": "list-1",
+                        "county": "travis",
+                        "price": 2400,
+                        "acreage": 0.3,
+                        "lat": 30.2,
+                        "lon": -97.7,
+                        "provider": "LandBoard",
+                        "listing_url": "https://example.test/listings/list-1",
+                    }
+                ]
+            }
+
+    class DummyClient:
+        def __init__(self, timeout: float):  # noqa: ARG002
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):  # noqa: ANN001, ARG002
+            return False
+
+        def get(self, url: str, headers: dict, params: dict):  # noqa: ARG002
+            return DummyResponse()
+
+    monkeypatch.setattr("app.providers.rapidapi_listings.httpx.Client", DummyClient)
+
+    results = provider.fetch(state="TX", max_price=5000)
+    assert len(results) == 1
+    assert results[0].source_name == "LandBoard"
+    assert results[0].source_url == "https://example.test/listings/list-1"
+
+
 def test_csv_auction_provider_parses_aliases_and_dedupes(tmp_path) -> None:
     csv_path = tmp_path / "county_sale.csv"
     csv_path.write_text(
@@ -400,6 +450,25 @@ def test_csv_auction_provider_parses_aliases_and_dedupes(tmp_path) -> None:
     assert len(candidates) == 1
     assert candidates[0].external_id == "A1"
     assert provider.last_stats.rejected_rows == 2
+
+
+def test_csv_auction_provider_parses_source_destination_alias(tmp_path) -> None:
+    csv_path = tmp_path / "county_sale_urls.csv"
+    csv_path.write_text(
+        "\n".join(
+            [
+                "auction_id,parcel_key,county,state,price,acreage,url,source_name",
+                "A3,PK-3,Bell,TX,1800,0.22,https://example.test/auctions/A3,County Tax Office",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    provider = CsvAuctionProvider(csv_dir=tmp_path, glob_pattern="*.csv", max_file_age_days=30)
+    candidates = provider.fetch(state="TX", max_price=5000)
+    assert len(candidates) == 1
+    assert candidates[0].source_url == "https://example.test/auctions/A3"
+    assert candidates[0].source_name == "County Tax Office"
 
 
 def test_auction_partial_parse_marks_run_degraded(session_factory, monkeypatch) -> None:

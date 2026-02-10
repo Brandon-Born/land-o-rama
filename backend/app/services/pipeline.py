@@ -267,6 +267,8 @@ def run_daily_pipeline(
                 parcel_id=parcel.id,
                 source_type=candidate.source_type,
                 source_id=candidate.external_id,
+                source_name=candidate.source_name or candidate.source,
+                source_url=candidate.source_url,
                 county=candidate.county,
                 state=candidate.state,
                 price=candidate.price,

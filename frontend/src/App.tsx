@@ -19,7 +19,7 @@ import type {
   SettingsResponse,
 } from "./types";
 
-type TabId = "dashboard" | "digest" | "runs";
+type TabId = "dashboard" | "opportunity" | "digest" | "runs";
 
 type DashboardQuery = {
   county: string;
@@ -96,19 +96,22 @@ function validateFilters(minScoreInput: string, maxPriceInput: string): FilterEr
   };
 }
 
-function readUrlState(): { query: DashboardQuery; tab: TabId } {
+function readUrlState(): { query: DashboardQuery; tab: TabId; opportunityId: string | null } {
   const search = new URLSearchParams(window.location.search);
   const tabParam = search.get("tab");
-  const tab: TabId = tabParam === "digest" || tabParam === "runs" ? tabParam : "dashboard";
+  const tab: TabId =
+    tabParam === "opportunity" || tabParam === "digest" || tabParam === "runs" ? tabParam : "dashboard";
 
   const county = (search.get("county") ?? "").trim();
   const minScore = parseOptionalNumber(search.get("minScore"));
   const maxPrice = parsePositiveInt(search.get("maxPrice"), DEFAULT_QUERY.maxPrice);
   const page = parsePositiveInt(search.get("page"), DEFAULT_QUERY.page);
   const pageSize = parsePositiveInt(search.get("pageSize"), DEFAULT_QUERY.pageSize);
+  const opportunityId = (search.get("opportunityId") ?? "").trim() || null;
 
   return {
     tab,
+    opportunityId,
     query: {
       county,
       minScore,
@@ -119,7 +122,7 @@ function readUrlState(): { query: DashboardQuery; tab: TabId } {
   };
 }
 
-function writeUrlState(query: DashboardQuery, tab: TabId): void {
+function writeUrlState(query: DashboardQuery, tab: TabId, opportunityId: string | null): void {
   const search = new URLSearchParams();
   if (query.county) search.set("county", query.county);
   if (query.minScore !== null) search.set("minScore", String(query.minScore));
@@ -127,6 +130,7 @@ function writeUrlState(query: DashboardQuery, tab: TabId): void {
   if (query.page !== DEFAULT_QUERY.page) search.set("page", String(query.page));
   if (query.pageSize !== DEFAULT_QUERY.pageSize) search.set("pageSize", String(query.pageSize));
   if (tab !== "dashboard") search.set("tab", tab);
+  if (opportunityId && tab === "opportunity") search.set("opportunityId", opportunityId);
 
   const next = `${window.location.pathname}${search.toString() ? `?${search.toString()}` : ""}`;
   window.history.replaceState(null, "", next);
@@ -137,6 +141,7 @@ export default function App() {
   const [opportunities, setOpportunities] = useState<OpportunityListItem[]>([]);
   const [opportunityTotal, setOpportunityTotal] = useState<number>(0);
   const [selected, setSelected] = useState<OpportunityDetail | null>(null);
+  const [selectedOpportunityId, setSelectedOpportunityId] = useState<string | null>(initial.opportunityId);
   const [latestDigest, setLatestDigest] = useState<DigestSummary | null>(null);
   const [digests, setDigests] = useState<DigestSummary[]>([]);
   const [runs, setRuns] = useState<RunStatus[]>([]);
@@ -153,7 +158,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<TabId>(initial.tab);
   const [runState, setRunState] = useState<string>("");
 
-  async function loadAll(currentQuery: DashboardQuery) {
+  async function loadAll(currentQuery: DashboardQuery, preferredOpportunityId: string | null) {
     setLoading(true);
     setError(null);
     try {
@@ -177,11 +182,27 @@ export default function App() {
       setDigests(digestsResponse.items);
       setRuns(runsResponse.items);
       setSettings(settingsResponse);
-      if (opportunitiesResponse.items.length > 0) {
-        const detail = await fetchOpportunity(opportunitiesResponse.items[0].id);
-        setSelected(detail);
+
+      const fallbackId = opportunitiesResponse.items[0]?.id ?? null;
+      const detailTargetId = preferredOpportunityId ?? fallbackId;
+      if (detailTargetId) {
+        try {
+          const detail = await fetchOpportunity(detailTargetId);
+          setSelected(detail);
+          setSelectedOpportunityId(detail.id);
+        } catch {
+          if (fallbackId && fallbackId !== detailTargetId) {
+            const fallbackDetail = await fetchOpportunity(fallbackId);
+            setSelected(fallbackDetail);
+            setSelectedOpportunityId(fallbackDetail.id);
+          } else {
+            setSelected(null);
+            setSelectedOpportunityId(null);
+          }
+        }
       } else {
         setSelected(null);
+        setSelectedOpportunityId(null);
       }
     } catch (loadError) {
       setError((loadError as Error).message);
@@ -191,12 +212,14 @@ export default function App() {
   }
 
   useEffect(() => {
-    void loadAll(query);
+    void loadAll(query, selectedOpportunityId);
+    // Keep detail sticky while paging/filtering so users can stay in the detail tab.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query]);
 
   useEffect(() => {
-    writeUrlState(query, activeTab);
-  }, [activeTab, query]);
+    writeUrlState(query, activeTab, selectedOpportunityId);
+  }, [activeTab, query, selectedOpportunityId]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -224,6 +247,8 @@ export default function App() {
     try {
       const detail = await fetchOpportunity(id);
       setSelected(detail);
+      setSelectedOpportunityId(id);
+      setActiveTab("opportunity");
       setError(null);
     } catch (selectError) {
       setError((selectError as Error).message);
@@ -245,7 +270,7 @@ export default function App() {
     try {
       const result = await runDailyJob();
       setRunState(`Run ${result.run_id} finished with status: ${result.status}`);
-      await loadAll(query);
+      await loadAll(query, selectedOpportunityId);
     } catch (runError) {
       setError((runError as Error).message);
       setRunState("Run failed");
@@ -253,7 +278,7 @@ export default function App() {
   }
 
   async function refreshDashboard() {
-    await loadAll(query);
+    await loadAll(query, selectedOpportunityId);
   }
 
   function applyFilters() {
@@ -342,47 +367,18 @@ export default function App() {
             </article>
           </section>
 
-          <section className="provider-strip card">
-            <h2>Provider Health</h2>
-            <div className="provider-meta">
-              <span>RapidAPI: {settings?.rapidapi_configured ? "Configured" : "Missing Key/Host"}</span>
-              <span>Regrid: {settings?.regrid_configured ? "Configured" : "Missing Key"}</span>
-              <span>Listing Slug: {settings?.rapidapi_provider_slug ?? "n/a"}</span>
-              <span>Metrics Slug: {settings?.rapidapi_metrics_slug ?? "n/a"}</span>
-              <span>Auction Source: {settings?.auction_source_mode ?? "n/a"}</span>
-              <span>CSV Dir: {settings?.auction_csv_dir ?? "n/a"}</span>
-              <span>CSV Glob: {settings?.auction_csv_glob ?? "n/a"}</span>
-              <span>CSV Age Days: {settings?.auction_max_file_age_days ?? 0}</span>
-              <span>Metrics Cache Days: {settings?.market_metrics_cache_lookback_days ?? 0}</span>
-              <span>
-                Personalization:{" "}
-                {settings?.personalization_ready
-                  ? `Ready (${settings?.feedback_labels_count ?? 0}/${settings?.personalization_threshold ?? 50})`
-                  : `Not Ready (${settings?.feedback_labels_count ?? 0}/${settings?.personalization_threshold ?? 50})`}
-              </span>
-            </div>
-            {providerHealth.length === 0 ? (
-              <p>No provider events yet.</p>
-            ) : (
-              <ul className="provider-list">
-                {providerHealth.map((event: ProviderEventStatus) => (
-                  <li key={`${event.provider}-${event.created_at}`}>
-                    <strong>{event.provider}</strong>
-                    <span className={`pill-${event.status}`}>{event.status}</span>
-                    <small>{new Date(event.created_at).toLocaleString()}</small>
-                    {event.error_summary && <em>{event.error_summary}</em>}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-
           <nav className="tabs">
             <button
               className={activeTab === "dashboard" ? "active" : ""}
               onClick={() => setActiveTab("dashboard")}
             >
               Dashboard
+            </button>
+            <button
+              className={activeTab === "opportunity" ? "active" : ""}
+              onClick={() => setActiveTab("opportunity")}
+            >
+              Opportunity
             </button>
             <button className={activeTab === "digest" ? "active" : ""} onClick={() => setActiveTab("digest")}>
               Digest
@@ -393,7 +389,7 @@ export default function App() {
           </nav>
 
           {activeTab === "dashboard" && (
-            <section className="dashboard-grid">
+            <section className="tab-content dashboard-list">
               <article className="card">
                 <h2>Top Opportunities</h2>
                 <section className="filters">
@@ -490,63 +486,81 @@ export default function App() {
                   </label>
                 </div>
               </article>
+            </section>
+          )}
 
-              <article className="card">
-                <h2>Opportunity Detail</h2>
-                {!selected ? (
-                  <p>Select a row to inspect scoring details.</p>
-                ) : (
-                  <div className="detail">
-                    <h3>
-                      {selected.county}, {selected.state}
-                    </h3>
-                    <p>
-                      {currency(selected.price)} · {selected.acreage.toFixed(2)} acres · {selected.source_type}
-                    </p>
-                    <div className="score-line">
-                      <span>Final Score</span>
-                      <strong className={scoreClass(selected.score_breakdown.final_score)}>
-                        {selected.score_breakdown.final_score.toFixed(2)}
-                      </strong>
+          {activeTab === "opportunity" && (
+            <section className="tab-content card">
+              <h2>Opportunity Detail</h2>
+              {!selected ? (
+                <p>Select a row in Dashboard to inspect scoring details.</p>
+              ) : (
+                <div className="detail">
+                  <h3>
+                    {selected.county}, {selected.state}
+                  </h3>
+                  <p>
+                    {currency(selected.price)} · {selected.acreage.toFixed(2)} acres · {selected.source_type}
+                  </p>
+                  <section className="source-destination">
+                    <div>
+                      <span>Listed On</span>
+                      <strong>{selected.source_name ?? selected.source_type}</strong>
                     </div>
-                    <div className="score-line">
-                      <span>Personalization Score</span>
-                      <strong>
-                        {selected.score_breakdown.personalization_score === null
-                          ? "n/a"
-                          : selected.score_breakdown.personalization_score.toFixed(2)}
-                      </strong>
-                    </div>
-                    <p>
-                      Model: {selected.model_version ?? "base-only"} · Blend Weight: {selected.blend_weight.toFixed(2)}
-                    </p>
-                    <ul className="reason-list">
-                      {selected.reason_codes.map((reason) => (
-                        <li key={reason.code}>
-                          <span>{reason.label}</span>
-                          <strong>{reason.impact.toFixed(1)}</strong>
-                        </li>
-                      ))}
-                      {selected.caution_code && (
-                        <li className="caution">
-                          <span>{selected.caution_code.label}</span>
-                          <strong>{selected.caution_code.impact.toFixed(1)}</strong>
-                        </li>
-                      )}
-                    </ul>
-
-                    <div className="feedback">
-                      <button onClick={() => void submitVote("up")}>Thumbs Up</button>
-                      <button onClick={() => void submitVote("down")}>Thumbs Down</button>
-                    </div>
+                    {selected.source_url ? (
+                      <a href={selected.source_url} target="_blank" rel="noreferrer">
+                        Open Source Listing
+                      </a>
+                    ) : (
+                      <small>
+                        No direct source URL was captured. Use source ID <strong>{selected.source_id}</strong> for
+                        manual lookup.
+                      </small>
+                    )}
+                  </section>
+                  <div className="score-line">
+                    <span>Final Score</span>
+                    <strong className={scoreClass(selected.score_breakdown.final_score)}>
+                      {selected.score_breakdown.final_score.toFixed(2)}
+                    </strong>
                   </div>
-                )}
-              </article>
+                  <div className="score-line">
+                    <span>Personalization Score</span>
+                    <strong>
+                      {selected.score_breakdown.personalization_score === null
+                        ? "n/a"
+                        : selected.score_breakdown.personalization_score.toFixed(2)}
+                    </strong>
+                  </div>
+                  <p>
+                    Model: {selected.model_version ?? "base-only"} · Blend Weight: {selected.blend_weight.toFixed(2)}
+                  </p>
+                  <ul className="reason-list">
+                    {selected.reason_codes.map((reason) => (
+                      <li key={reason.code}>
+                        <span>{reason.label}</span>
+                        <strong>{reason.impact.toFixed(1)}</strong>
+                      </li>
+                    ))}
+                    {selected.caution_code && (
+                      <li className="caution">
+                        <span>{selected.caution_code.label}</span>
+                        <strong>{selected.caution_code.impact.toFixed(1)}</strong>
+                      </li>
+                    )}
+                  </ul>
+
+                  <div className="feedback">
+                    <button onClick={() => void submitVote("up")}>Thumbs Up</button>
+                    <button onClick={() => void submitVote("down")}>Thumbs Down</button>
+                  </div>
+                </div>
+              )}
             </section>
           )}
 
           {activeTab === "digest" && (
-            <section className="card">
+            <section className="tab-content card">
               <h2>Daily Digest</h2>
               {latestDigest ? (
                 <p>
@@ -568,29 +582,66 @@ export default function App() {
           )}
 
           {activeTab === "runs" && (
-            <section className="card">
-              <h2>Pipeline Runs</h2>
-              <ul className="list">
-                {runs.map((run) => (
-                  <li key={run.id}>
-                    <span>
-                      {run.status.toUpperCase()} · {new Date(run.started_at).toLocaleString()}
-                    </span>
-                    <small>
-                      Listings: {run.listings_ingested}, Auctions: {run.auctions_ingested}, Scored:{" "}
-                      {run.candidates_scored}, Excluded: {run.excluded_count}
-                    </small>
-                    {run.provider_events.length > 0 && (
+            <section className="tab-content runs-view">
+              <article className="provider-strip card">
+                <h2>Provider Health</h2>
+                <div className="provider-meta">
+                  <span>RapidAPI: {settings?.rapidapi_configured ? "Configured" : "Missing Key/Host"}</span>
+                  <span>Regrid: {settings?.regrid_configured ? "Configured" : "Missing Key"}</span>
+                  <span>Listing Slug: {settings?.rapidapi_provider_slug ?? "n/a"}</span>
+                  <span>Metrics Slug: {settings?.rapidapi_metrics_slug ?? "n/a"}</span>
+                  <span>Auction Source: {settings?.auction_source_mode ?? "n/a"}</span>
+                  <span>CSV Dir: {settings?.auction_csv_dir ?? "n/a"}</span>
+                  <span>CSV Glob: {settings?.auction_csv_glob ?? "n/a"}</span>
+                  <span>CSV Age Days: {settings?.auction_max_file_age_days ?? 0}</span>
+                  <span>Metrics Cache Days: {settings?.market_metrics_cache_lookback_days ?? 0}</span>
+                  <span>
+                    Personalization:{" "}
+                    {settings?.personalization_ready
+                      ? `Ready (${settings?.feedback_labels_count ?? 0}/${settings?.personalization_threshold ?? 50})`
+                      : `Not Ready (${settings?.feedback_labels_count ?? 0}/${settings?.personalization_threshold ?? 50})`}
+                  </span>
+                </div>
+                {providerHealth.length === 0 ? (
+                  <p>No provider events yet.</p>
+                ) : (
+                  <ul className="provider-list">
+                    {providerHealth.map((event: ProviderEventStatus) => (
+                      <li key={`${event.provider}-${event.created_at}`}>
+                        <strong>{event.provider}</strong>
+                        <span className={`pill-${event.status}`}>{event.status}</span>
+                        <small>{new Date(event.created_at).toLocaleString()}</small>
+                        {event.error_summary && <em>{event.error_summary}</em>}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </article>
+
+              <article className="card">
+                <h2>Pipeline Runs</h2>
+                <ul className="list">
+                  {runs.map((run) => (
+                    <li key={run.id}>
+                      <span>
+                        {run.status.toUpperCase()} · {new Date(run.started_at).toLocaleString()}
+                      </span>
                       <small>
-                        Providers:{" "}
-                        {run.provider_events
-                          .map((event) => `${event.provider}:${event.status}`)
-                          .join(" | ")}
+                        Listings: {run.listings_ingested}, Auctions: {run.auctions_ingested}, Scored: {" "}
+                        {run.candidates_scored}, Excluded: {run.excluded_count}
                       </small>
-                    )}
-                  </li>
-                ))}
-              </ul>
+                      {run.provider_events.length > 0 && (
+                        <small>
+                          Providers: {" "}
+                          {run.provider_events
+                            .map((event) => `${event.provider}:${event.status}`)
+                            .join(" | ")}
+                        </small>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </article>
             </section>
           )}
         </>

@@ -116,6 +116,8 @@ class Opportunity(Base):
     parcel_id: Mapped[str] = mapped_column(ForeignKey("parcels.id"), index=True)
     source_type: Mapped[str] = mapped_column(String(16))
     source_id: Mapped[str] = mapped_column(String(128), index=True)
+    source_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    source_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     county: Mapped[str] = mapped_column(String(128), index=True)
     state: Mapped[str] = mapped_column(String(2), index=True)
     price: Mapped[float] = mapped_column(Float, index=True)

@@ -24,6 +24,8 @@ class CandidateRecord:
     road_distance_miles: float
     days_on_market: int
     price_per_acre: float
+    source_name: str | None = None
+    source_url: str | None = None
 
 
 @dataclass(slots=True)
@@ -43,6 +45,8 @@ def mock_candidates(state: str = "TX") -> list[CandidateRecord]:
             source_type="listing",
             source="mock_listings",
             external_id="LST-1001",
+            source_name="Mock Listings",
+            source_url="https://example.test/listings/LST-1001",
             parcel_key="TX-TRAVIS-001",
             county="Travis",
             state=state,
@@ -63,6 +67,8 @@ def mock_candidates(state: str = "TX") -> list[CandidateRecord]:
             source_type="auction",
             source="mock_auctions",
             external_id="AUC-2001",
+            source_name="Mock Auctions",
+            source_url="https://example.test/auctions/AUC-2001",
             parcel_key="TX-BELL-014",
             county="Bell",
             state=state,
@@ -83,6 +89,8 @@ def mock_candidates(state: str = "TX") -> list[CandidateRecord]:
             source_type="listing",
             source="mock_listings",
             external_id="LST-1002",
+            source_name="Mock Listings",
+            source_url="https://example.test/listings/LST-1002",
             parcel_key="TX-HARRIS-032",
             county="Harris",
             state=state,
@@ -103,6 +111,8 @@ def mock_candidates(state: str = "TX") -> list[CandidateRecord]:
             source_type="auction",
             source="mock_auctions",
             external_id="AUC-2002",
+            source_name="Mock Auctions",
+            source_url="https://example.test/auctions/AUC-2002",
             parcel_key="TX-CAMERON-011",
             county="Cameron",
             state=state,
@@ -123,6 +133,8 @@ def mock_candidates(state: str = "TX") -> list[CandidateRecord]:
             source_type="listing",
             source="mock_listings",
             external_id="LST-1003",
+            source_name="Mock Listings",
+            source_url="https://example.test/listings/LST-1003",
             parcel_key="TX-BEXAR-022",
             county="Bexar",
             state=state,

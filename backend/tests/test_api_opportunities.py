@@ -26,6 +26,8 @@ def test_opportunity_detail_success_and_not_found(client) -> None:
     detail = detail_response.json()
     assert detail["id"] == first_id
     assert detail["score_breakdown"]["final_score"] >= 0
+    assert "source_name" in detail
+    assert "source_url" in detail
 
     missing_response = client.get("/api/v1/opportunities/not-a-real-id")
     assert missing_response.status_code == 404

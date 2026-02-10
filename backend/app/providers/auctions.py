@@ -65,6 +65,8 @@ class CsvAuctionProvider:
         "road_distance_miles": ["road_distance_miles", "road_distance"],
         "days_on_market": ["days_on_market", "dom"],
         "price_per_acre": ["price_per_acre", "ppa"],
+        "source_name": ["source_name", "site_name", "provider_name"],
+        "source_url": ["source_url", "url", "auction_url", "listing_url"],
     }
 
     def fetch(self, state: str, max_price: float) -> list[CandidateRecord]:
@@ -172,6 +174,8 @@ class CsvAuctionProvider:
                 road_distance_miles=road_distance_miles,
                 days_on_market=days_on_market,
                 price_per_acre=price_per_acre,
+                source_name=self._read(row, "source_name") or self.provider_name,
+                source_url=self._read(row, "source_url") or None,
             ),
             None,
         )

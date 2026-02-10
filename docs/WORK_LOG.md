@@ -298,3 +298,36 @@
 - Next recommended tasks:
   - Add a lightweight `make smoke` target to hit `/health` and one API endpoint after startup.
   - Consider a `make dev-live` variant that verifies required live-provider env vars before launch.
+
+## 2026-02-10 - Dashboard De-Cluttering + Opportunity Source Destination Visibility
+- Task summary:
+  - Reduced dashboard overload by splitting list and detail into separate tabs (`Dashboard` and `Opportunity`) and moving provider diagnostics into the `Runs` tab.
+  - Added opportunity source destination metadata (`source_name`, `source_url`) end-to-end from provider parsing through persistence and detail API response.
+  - Added UI surfacing for destination links with manual-lookup fallback when no URL is captured.
+  - Added migration for new opportunity source destination columns and expanded regression tests across backend/frontend.
+- Files changed:
+  - `/Users/bborn/land-o-rama/backend/alembic/versions/0003_opportunity_source_destination.py`
+  - `/Users/bborn/land-o-rama/backend/app/models/entities.py`
+  - `/Users/bborn/land-o-rama/backend/app/providers/mock_data.py`
+  - `/Users/bborn/land-o-rama/backend/app/providers/rapidapi_listings.py`
+  - `/Users/bborn/land-o-rama/backend/app/providers/auctions.py`
+  - `/Users/bborn/land-o-rama/backend/app/services/pipeline.py`
+  - `/Users/bborn/land-o-rama/backend/app/schemas/api.py`
+  - `/Users/bborn/land-o-rama/backend/app/api/routes.py`
+  - `/Users/bborn/land-o-rama/backend/tests/test_api_opportunities.py`
+  - `/Users/bborn/land-o-rama/backend/tests/test_provider_pipeline.py`
+  - `/Users/bborn/land-o-rama/frontend/src/App.tsx`
+  - `/Users/bborn/land-o-rama/frontend/src/types.ts`
+  - `/Users/bborn/land-o-rama/frontend/src/styles.css`
+  - `/Users/bborn/land-o-rama/frontend/src/App.test.tsx`
+  - `/Users/bborn/land-o-rama/docs/API_SPEC.md`
+  - `/Users/bborn/land-o-rama/docs/ARCHITECTURE.md`
+  - `/Users/bborn/land-o-rama/docs/WORK_LOG.md`
+- Validation performed:
+  - `cd /Users/bborn/land-o-rama/backend && . .venv/bin/activate && pytest -q` passed (`30 passed`).
+  - `cd /Users/bborn/land-o-rama/frontend && npm run test -- --run` passed (`14 passed`).
+  - `cd /Users/bborn/land-o-rama/frontend && npm run build` passed.
+- Next recommended tasks:
+  - Add backend API integration coverage for historical opportunities with `null` source destination fields after migration.
+  - Add a compact in-row listing-source indicator in the dashboard table to preview destination availability before opening detail.
+  - Add operator-facing data quality metrics for source URL capture rates by provider.

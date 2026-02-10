@@ -33,6 +33,7 @@ const allItems: OpportunityItem[] = Array.from({ length: 30 }, (_, idx) => {
 
 function detailFor(id: string) {
   const item = allItems.find((candidate) => candidate.id === id) ?? allItems[0];
+  const hasDirectUrl = item.id !== "opp-3";
   return {
     id: item.id,
     parcel_id: `parcel-${item.id}`,
@@ -42,6 +43,8 @@ function detailFor(id: string) {
     acreage: item.acreage,
     source_type: item.source_type,
     source_id: item.id,
+    source_name: item.source_type === "auction" ? "County Auction Feed" : "RapidAPI Listing Feed",
+    source_url: hasDirectUrl ? `https://example.test/opportunity/${item.id}` : null,
     is_excluded: false,
     exclusion_reason: null,
     reason_codes: [
@@ -268,6 +271,18 @@ it("hydrates query state from URL on first load", async () => {
   expect(firstCall.searchParams.get("page_size")).toBe("10");
 });
 
+it("hydrates opportunity tab from URL and requests selected detail", async () => {
+  window.history.replaceState(null, "", "/?tab=opportunity&opportunityId=opp-5");
+  const { calls } = installFetchMock(defaultHandler);
+  render(<App />);
+
+  await screen.findByRole("heading", { name: "Opportunity Detail" });
+  await waitFor(() => {
+    const detailCall = calls.find((url) => url.pathname.endsWith("/opportunities/opp-5"));
+    expect(detailCall).toBeDefined();
+  });
+});
+
 it("loads detail when selecting a row", async () => {
   const user = userEvent.setup();
   const { calls } = installFetchMock(defaultHandler);
@@ -276,6 +291,7 @@ it("loads detail when selecting a row", async () => {
 
   const rows = screen.getAllByRole("row");
   await user.click(rows[2]);
+  await screen.findByRole("heading", { name: "Opportunity Detail" });
   await waitFor(() => {
     const detailCall = calls.find((url) => url.pathname.endsWith("/opportunities/opp-2"));
     expect(detailCall).toBeDefined();
@@ -294,6 +310,7 @@ it("renders error banner when opportunities request fails", async () => {
 });
 
 it("renders provider health configuration and events", async () => {
+  const user = userEvent.setup();
   installFetchMock((url, init) => {
     if (url.pathname.endsWith("/settings")) {
       return {
@@ -328,6 +345,8 @@ it("renders provider health configuration and events", async () => {
   });
 
   render(<App />);
+  await screen.findByRole("heading", { name: "Top Opportunities" });
+  await user.click(screen.getByRole("button", { name: "Runs" }));
   await waitFor(() => {
     expect(screen.getByText("RapidAPI: Configured")).toBeInTheDocument();
     expect(screen.getByText("Regrid: Missing Key")).toBeInTheDocument();
@@ -338,6 +357,30 @@ it("renders provider health configuration and events", async () => {
     expect(screen.getByText("provider timeout")).toBeInTheDocument();
     expect(screen.getByText("missing api key")).toBeInTheDocument();
   });
+});
+
+it("shows source destination link when available", async () => {
+  const user = userEvent.setup();
+  const { calls } = installFetchMock(defaultHandler);
+  render(<App />);
+  await waitForOpportunitiesLoaded(calls);
+
+  const rows = screen.getAllByRole("row");
+  await user.click(rows[1]);
+  const link = await screen.findByRole("link", { name: "Open Source Listing" });
+  expect(link).toHaveAttribute("href", "https://example.test/opportunity/opp-1");
+});
+
+it("shows manual lookup fallback when source URL is unavailable", async () => {
+  const user = userEvent.setup();
+  const { calls } = installFetchMock(defaultHandler);
+  render(<App />);
+  await waitForOpportunitiesLoaded(calls);
+
+  const rows = screen.getAllByRole("row");
+  await user.click(rows[3]);
+  expect(await screen.findByText(/No direct source URL was captured/i)).toBeInTheDocument();
+  expect(screen.getByText(/source ID/i)).toBeInTheDocument();
 });
 
 it("renders runs tab with degraded run provider summary", async () => {

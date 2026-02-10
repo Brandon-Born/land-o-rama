@@ -139,10 +139,6 @@ select {
   border-color: #172023;
 }
 
-.provider-strip {
-  margin-top: 1rem;
-}
-
 .provider-meta {
   display: flex;
   flex-wrap: wrap;
@@ -204,6 +200,15 @@ select {
   margin-top: 1rem;
   display: grid;
   grid-template-columns: 1.4fr 1fr;
+  gap: 1rem;
+}
+
+.tab-content {
+  margin-top: 1rem;
+}
+
+.runs-view {
+  display: grid;
   gap: 1rem;
 }
 
@@ -298,6 +303,35 @@ tbody tr:hover {
 .detail p {
   margin-top: 0;
   color: #4c5a62;
+}
+
+.source-destination {
+  margin: 0.8rem 0;
+  padding: 0.75rem;
+  border: 1px solid #e4eaee;
+  border-radius: 10px;
+  background: #f7fafc;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.source-destination span {
+  color: #4c5a62;
+  font-size: 0.82rem;
+}
+
+.source-destination strong {
+  display: block;
+}
+
+.source-destination a {
+  width: fit-content;
+  color: #1e6f5c;
+  font-weight: 600;
+}
+
+.source-destination small {
+  color: #5c6a72;
 }
 
 .score-line {

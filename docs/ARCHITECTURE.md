@@ -59,7 +59,7 @@ Land-O-Rama is a local-first web application with:
 - Local-only deployment in v1 (no public internet exposure required).
 
 ## Frontend Information Architecture
-- Dashboard: filters, rankings, KPIs, disclaimers.
-- Opportunity detail: score factors, risks, comps context, feedback.
+- Dashboard: filters, rankings, KPIs, disclaimers (list-first view).
+- Opportunity detail: dedicated tab with score factors, risks, source destination link, and feedback.
 - Digest history: latest + prior generated digests.
-- Runs/settings: operational health and connector status.
+- Runs/settings: operational health and connector status (including provider diagnostics).
