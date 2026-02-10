@@ -55,6 +55,12 @@ npm run dev
 
 Open: `http://localhost:5173`
 
+Frontend tests:
+```bash
+cd /Users/bborn/land-o-rama/frontend
+npm run test
+```
+
 ## Database Migrations
 From `/Users/bborn/land-o-rama`:
 - `make db-upgrade`

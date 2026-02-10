@@ -22,8 +22,23 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T;
 }
 
-export function fetchOpportunities(): Promise<OpportunityListResponse> {
-  return request<OpportunityListResponse>("/opportunities");
+export type OpportunityQueryParams = {
+  county?: string;
+  minScore?: number;
+  maxPrice?: number;
+  page?: number;
+  pageSize?: number;
+};
+
+export function fetchOpportunities(params?: OpportunityQueryParams): Promise<OpportunityListResponse> {
+  const query = new URLSearchParams();
+  if (params?.county) query.set("county", params.county);
+  if (params?.minScore !== undefined) query.set("min_score", String(params.minScore));
+  if (params?.maxPrice !== undefined) query.set("max_price", String(params.maxPrice));
+  if (params?.page !== undefined) query.set("page", String(params.page));
+  if (params?.pageSize !== undefined) query.set("page_size", String(params.pageSize));
+  const suffix = query.size > 0 ? `?${query.toString()}` : "";
+  return request<OpportunityListResponse>(`/opportunities${suffix}`);
 }
 
 export function fetchOpportunity(id: string): Promise<OpportunityDetail> {

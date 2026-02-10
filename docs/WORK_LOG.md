@@ -167,3 +167,37 @@
   - Implement real market metrics provider(s) to replace mock macro metrics in live mode.
   - Add UI filter controls (county, min score, max price) and pagination controls wired to query params.
   - Add frontend tests (critical flows + provider health rendering) to mirror backend integration coverage.
+
+## 2026-02-10 - Dashboard Filters/Pagination + Frontend Critical Test Coverage
+- Task summary:
+  - Implemented dashboard filtering controls for county, min score, and max price with explicit Apply/Reset behavior.
+  - Added classic paginated table controls (Prev/Next, total pages, page size selector).
+  - Wired opportunities query and tab state to URL query params for reload-safe/shareable views.
+  - Extended frontend API client to pass backend-supported opportunities query params (`county`, `min_score`, `max_price`, `page`, `page_size`).
+  - Added frontend test stack (`Vitest + React Testing Library + user-event + jsdom`) and critical-flow tests for:
+    - default query behavior
+    - apply/reset filters
+    - pagination + page size changes
+    - URL state hydration
+    - row selection detail fetch
+    - error rendering
+- Files changed:
+  - `/Users/bborn/land-o-rama/README.md`
+  - `/Users/bborn/land-o-rama/frontend/package.json`
+  - `/Users/bborn/land-o-rama/frontend/package-lock.json`
+  - `/Users/bborn/land-o-rama/frontend/src/App.tsx`
+  - `/Users/bborn/land-o-rama/frontend/src/api/client.ts`
+  - `/Users/bborn/land-o-rama/frontend/src/styles.css`
+  - `/Users/bborn/land-o-rama/frontend/src/App.test.tsx`
+  - `/Users/bborn/land-o-rama/frontend/src/test/setup.ts`
+  - `/Users/bborn/land-o-rama/frontend/src/test/mockFetch.ts`
+  - `/Users/bborn/land-o-rama/frontend/vitest.config.ts`
+  - `/Users/bborn/land-o-rama/docs/WORK_LOG.md`
+- Validation performed:
+  - `cd /Users/bborn/land-o-rama/frontend && npm run test` passed (`7 passed`).
+  - `cd /Users/bborn/land-o-rama/frontend && npm run build` passed.
+  - `cd /Users/bborn/land-o-rama/backend && . .venv/bin/activate && pytest -q` passed (`18 passed`).
+- Next recommended tasks:
+  - Add provider-health UI tests and runs-tab rendering tests to extend frontend regression coverage beyond dashboard flows.
+  - Add debounce/validation UX polish for numeric filter inputs (e.g., min score bounds and max price floor messaging).
+  - Implement live market metrics provider to complete non-mock live mode data pipeline quality.

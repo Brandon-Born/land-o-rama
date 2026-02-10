@@ -19,6 +19,24 @@ import type {
   SettingsResponse,
 } from "./types";
 
+type TabId = "dashboard" | "digest" | "runs";
+
+type DashboardQuery = {
+  county: string;
+  minScore: number | null;
+  maxPrice: number;
+  page: number;
+  pageSize: number;
+};
+
+const DEFAULT_QUERY: DashboardQuery = {
+  county: "",
+  minScore: null,
+  maxPrice: 5000,
+  page: 1,
+  pageSize: 25,
+};
+
 function currency(value: number): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(
     value,
@@ -31,25 +49,94 @@ function scoreClass(value: number): string {
   return "score-low";
 }
 
+function parsePositiveInt(value: string | null, fallback: number): number {
+  if (!value) return fallback;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function parseOptionalNumber(value: string | null): number | null {
+  if (!value) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function readUrlState(): { query: DashboardQuery; tab: TabId } {
+  const search = new URLSearchParams(window.location.search);
+  const tabParam = search.get("tab");
+  const tab: TabId = tabParam === "digest" || tabParam === "runs" ? tabParam : "dashboard";
+
+  const county = (search.get("county") ?? "").trim();
+  const minScore = parseOptionalNumber(search.get("minScore"));
+  const maxPrice = parsePositiveInt(search.get("maxPrice"), DEFAULT_QUERY.maxPrice);
+  const page = parsePositiveInt(search.get("page"), DEFAULT_QUERY.page);
+  const pageSize = parsePositiveInt(search.get("pageSize"), DEFAULT_QUERY.pageSize);
+
+  return {
+    tab,
+    query: {
+      county,
+      minScore,
+      maxPrice,
+      page,
+      pageSize,
+    },
+  };
+}
+
+function writeUrlState(query: DashboardQuery, tab: TabId): void {
+  const search = new URLSearchParams();
+  if (query.county) search.set("county", query.county);
+  if (query.minScore !== null) search.set("minScore", String(query.minScore));
+  if (query.maxPrice !== DEFAULT_QUERY.maxPrice) search.set("maxPrice", String(query.maxPrice));
+  if (query.page !== DEFAULT_QUERY.page) search.set("page", String(query.page));
+  if (query.pageSize !== DEFAULT_QUERY.pageSize) search.set("pageSize", String(query.pageSize));
+  if (tab !== "dashboard") search.set("tab", tab);
+
+  const next = `${window.location.pathname}${search.toString() ? `?${search.toString()}` : ""}`;
+  window.history.replaceState(null, "", next);
+}
+
 export default function App() {
+  const initial = readUrlState();
   const [opportunities, setOpportunities] = useState<OpportunityListItem[]>([]);
+  const [opportunityTotal, setOpportunityTotal] = useState<number>(0);
   const [selected, setSelected] = useState<OpportunityDetail | null>(null);
   const [latestDigest, setLatestDigest] = useState<DigestSummary | null>(null);
   const [digests, setDigests] = useState<DigestSummary[]>([]);
   const [runs, setRuns] = useState<RunStatus[]>([]);
   const [settings, setSettings] = useState<SettingsResponse | null>(null);
+  const [query, setQuery] = useState<DashboardQuery>(initial.query);
+  const [filterCounty, setFilterCounty] = useState<string>(initial.query.county);
+  const [filterMinScore, setFilterMinScore] = useState<string>(
+    initial.query.minScore === null ? "" : String(initial.query.minScore),
+  );
+  const [filterMaxPrice, setFilterMaxPrice] = useState<string>(String(initial.query.maxPrice));
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"dashboard" | "digest" | "runs">("dashboard");
+  const [activeTab, setActiveTab] = useState<TabId>(initial.tab);
   const [runState, setRunState] = useState<string>("");
 
-  async function loadAll() {
+  async function loadAll(currentQuery: DashboardQuery) {
     setLoading(true);
     setError(null);
     try {
       const [opportunitiesResponse, latestDigestResponse, digestsResponse, runsResponse, settingsResponse] =
-        await Promise.all([fetchOpportunities(), fetchLatestDigest(), fetchDigests(), fetchRuns(), fetchSettings()]);
+        await Promise.all([
+          fetchOpportunities({
+            county: currentQuery.county || undefined,
+            minScore: currentQuery.minScore ?? undefined,
+            maxPrice: currentQuery.maxPrice,
+            page: currentQuery.page,
+            pageSize: currentQuery.pageSize,
+          }),
+          fetchLatestDigest(),
+          fetchDigests(),
+          fetchRuns(),
+          fetchSettings(),
+        ]);
       setOpportunities(opportunitiesResponse.items);
+      setOpportunityTotal(opportunitiesResponse.total);
       setLatestDigest(latestDigestResponse);
       setDigests(digestsResponse.items);
       setRuns(runsResponse.items);
@@ -68,8 +155,12 @@ export default function App() {
   }
 
   useEffect(() => {
-    void loadAll();
-  }, []);
+    void loadAll(query);
+  }, [query]);
+
+  useEffect(() => {
+    writeUrlState(query, activeTab);
+  }, [activeTab, query]);
 
   const kpis = useMemo(() => {
     const total = opportunities.length;
@@ -80,6 +171,7 @@ export default function App() {
   }, [opportunities]);
 
   const providerHealth = useMemo(() => settings?.provider_health ?? [], [settings]);
+  const totalPages = useMemo(() => Math.max(1, Math.ceil(opportunityTotal / query.pageSize)), [opportunityTotal, query.pageSize]);
 
   async function selectOpportunity(id: string) {
     try {
@@ -106,11 +198,49 @@ export default function App() {
     try {
       const result = await runDailyJob();
       setRunState(`Run ${result.run_id} finished with status: ${result.status}`);
-      await loadAll();
+      await loadAll(query);
     } catch (runError) {
       setError((runError as Error).message);
       setRunState("Run failed");
     }
+  }
+
+  async function refreshDashboard() {
+    await loadAll(query);
+  }
+
+  function applyFilters() {
+    const minScore = parseOptionalNumber(filterMinScore.trim() || null);
+    const maxPriceInput = parsePositiveInt(filterMaxPrice.trim() || null, DEFAULT_QUERY.maxPrice);
+    setQuery((previous) => ({
+      ...previous,
+      county: filterCounty.trim(),
+      minScore,
+      maxPrice: maxPriceInput,
+      page: 1,
+    }));
+  }
+
+  function resetFilters() {
+    setFilterCounty(DEFAULT_QUERY.county);
+    setFilterMinScore("");
+    setFilterMaxPrice(String(DEFAULT_QUERY.maxPrice));
+    setQuery({ ...DEFAULT_QUERY, pageSize: query.pageSize });
+  }
+
+  function goToPage(nextPage: number) {
+    setQuery((previous) => ({
+      ...previous,
+      page: Math.max(1, Math.min(nextPage, totalPages)),
+    }));
+  }
+
+  function updatePageSize(nextPageSize: number) {
+    setQuery((previous) => ({
+      ...previous,
+      pageSize: nextPageSize,
+      page: 1,
+    }));
   }
 
   return (
@@ -121,7 +251,7 @@ export default function App() {
           <p>Texas sub-$5k land scanner with 5-year upside scoring and strict risk exclusions.</p>
         </div>
         <div className="controls">
-          <button onClick={() => void loadAll()}>Refresh</button>
+          <button onClick={() => void refreshDashboard()}>Refresh</button>
           <button className="primary" onClick={() => void triggerRun()}>
             Run Daily Scan
           </button>
@@ -201,6 +331,43 @@ export default function App() {
             <section className="dashboard-grid">
               <article className="card">
                 <h2>Top Opportunities</h2>
+                <section className="filters">
+                  <label>
+                    County
+                    <input
+                      value={filterCounty}
+                      onChange={(event) => setFilterCounty(event.target.value)}
+                      placeholder="e.g. Travis"
+                    />
+                  </label>
+                  <label>
+                    Min Score
+                    <input
+                      value={filterMinScore}
+                      onChange={(event) => setFilterMinScore(event.target.value)}
+                      type="number"
+                      min={0}
+                      max={100}
+                      placeholder="0-100"
+                    />
+                  </label>
+                  <label>
+                    Max Price
+                    <input
+                      value={filterMaxPrice}
+                      onChange={(event) => setFilterMaxPrice(event.target.value)}
+                      type="number"
+                      min={0}
+                      step={100}
+                    />
+                  </label>
+                  <div className="filter-actions">
+                    <button className="primary" onClick={applyFilters}>
+                      Apply
+                    </button>
+                    <button onClick={resetFilters}>Reset</button>
+                  </div>
+                </section>
                 <table>
                   <thead>
                     <tr>
@@ -211,18 +378,46 @@ export default function App() {
                     </tr>
                   </thead>
                   <tbody>
-                    {opportunities.map((item) => (
-                      <tr key={item.id} onClick={() => void selectOpportunity(item.id)}>
-                        <td>{item.county}</td>
-                        <td>{currency(item.price)}</td>
-                        <td>{item.acreage.toFixed(2)}</td>
-                        <td>
-                          <span className={`score-pill ${scoreClass(item.final_score)}`}>{item.final_score}</span>
-                        </td>
+                    {opportunities.length === 0 ? (
+                      <tr>
+                        <td colSpan={4}>No opportunities matched your filters.</td>
                       </tr>
-                    ))}
+                    ) : (
+                      opportunities.map((item) => (
+                        <tr key={item.id} onClick={() => void selectOpportunity(item.id)}>
+                          <td>{item.county}</td>
+                          <td>{currency(item.price)}</td>
+                          <td>{item.acreage.toFixed(2)}</td>
+                          <td>
+                            <span className={`score-pill ${scoreClass(item.final_score)}`}>{item.final_score}</span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
+                <div className="pagination">
+                  <button onClick={() => goToPage(query.page - 1)} disabled={query.page <= 1}>
+                    Prev
+                  </button>
+                  <span>
+                    Page {query.page} of {totalPages} · Total {opportunityTotal}
+                  </span>
+                  <button onClick={() => goToPage(query.page + 1)} disabled={query.page >= totalPages}>
+                    Next
+                  </button>
+                  <label>
+                    Page Size
+                    <select
+                      value={query.pageSize}
+                      onChange={(event) => updatePageSize(Number.parseInt(event.target.value, 10))}
+                    >
+                      <option value={10}>10</option>
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                    </select>
+                  </label>
+                </div>
               </article>
 
               <article className="card">
