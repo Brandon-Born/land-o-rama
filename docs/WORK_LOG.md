@@ -1,0 +1,74 @@
+# Work Log
+
+## 2026-02-10 - Repository Initialization and Core Documentation
+- Task summary:
+  - Initialized git repository and created documentation-first project foundation.
+  - Locked product/architecture/scoring/API/backlog specs for v1.
+- Files changed:
+  - `/Users/bborn/land-o-rama/.gitignore`
+  - `/Users/bborn/land-o-rama/README.md`
+  - `/Users/bborn/land-o-rama/AGENTS.md`
+  - `/Users/bborn/land-o-rama/docs/PROJECT_SPEC.md`
+  - `/Users/bborn/land-o-rama/docs/ARCHITECTURE.md`
+  - `/Users/bborn/land-o-rama/docs/SCORING_SPEC.md`
+  - `/Users/bborn/land-o-rama/docs/API_SPEC.md`
+  - `/Users/bborn/land-o-rama/docs/IMPLEMENTATION_BACKLOG.md`
+- Validation performed:
+  - Verified repository state and clean initial commit creation.
+- Next recommended tasks:
+  - Implement Phase 1 scaffold and Phase 2 mock ingestion vertical slice.
+
+## 2026-02-10 - MVP Backend and Frontend Implementation
+- Task summary:
+  - Implemented local FastAPI backend with SQLite models, scoring engine, mock providers, daily pipeline, digest generation, run logs, and API routes.
+  - Implemented React frontend with dashboard/detail/digest/runs panels and feedback actions.
+  - Added basic scoring/exclusion tests and development Make targets.
+- Files changed:
+  - `/Users/bborn/land-o-rama/README.md`
+  - `/Users/bborn/land-o-rama/Makefile`
+  - `/Users/bborn/land-o-rama/backend/.env.example`
+  - `/Users/bborn/land-o-rama/backend/requirements.txt`
+  - `/Users/bborn/land-o-rama/backend/pytest.ini`
+  - `/Users/bborn/land-o-rama/backend/app/main.py`
+  - `/Users/bborn/land-o-rama/backend/app/api/routes.py`
+  - `/Users/bborn/land-o-rama/backend/app/core/config.py`
+  - `/Users/bborn/land-o-rama/backend/app/db/session.py`
+  - `/Users/bborn/land-o-rama/backend/app/models/base.py`
+  - `/Users/bborn/land-o-rama/backend/app/models/entities.py`
+  - `/Users/bborn/land-o-rama/backend/app/providers/mock_data.py`
+  - `/Users/bborn/land-o-rama/backend/app/schemas/api.py`
+  - `/Users/bborn/land-o-rama/backend/app/scoring/engine.py`
+  - `/Users/bborn/land-o-rama/backend/app/services/pipeline.py`
+  - `/Users/bborn/land-o-rama/backend/app/services/settings.py`
+  - `/Users/bborn/land-o-rama/backend/tests/test_scoring.py`
+  - `/Users/bborn/land-o-rama/frontend/package.json`
+  - `/Users/bborn/land-o-rama/frontend/vite.config.ts`
+  - `/Users/bborn/land-o-rama/frontend/index.html`
+  - `/Users/bborn/land-o-rama/frontend/src/main.tsx`
+  - `/Users/bborn/land-o-rama/frontend/src/App.tsx`
+  - `/Users/bborn/land-o-rama/frontend/src/api/client.ts`
+  - `/Users/bborn/land-o-rama/frontend/src/types.ts`
+  - `/Users/bborn/land-o-rama/frontend/src/styles.css`
+  - `/Users/bborn/land-o-rama/frontend/tsconfig.json`
+  - `/Users/bborn/land-o-rama/frontend/tsconfig.node.json`
+- Validation performed:
+  - `python3 -m compileall /Users/bborn/land-o-rama/backend/app` passed.
+  - Manual invocation of scoring tests with `PYTHONPATH=/Users/bborn/land-o-rama/backend` passed.
+  - Not run: full `pytest` due to missing local dependency install in current environment.
+- Next recommended tasks:
+  - Install backend/frontend dependencies and run app end-to-end locally.
+  - Add integration tests for `/api/v1/jobs/run-daily` and digest generation.
+  - Implement live adapter interfaces for RapidAPI listings and Regrid parcel enrichment.
+
+## 2026-02-10 - Pipeline Payload Persistence Fix
+- Task summary:
+  - Fixed ETL raw payload persistence to use `dataclasses.asdict()` for slotted dataclass records.
+- Files changed:
+  - `/Users/bborn/land-o-rama/backend/app/services/pipeline.py`
+  - `/Users/bborn/land-o-rama/backend/app/core/config.py`
+- Validation performed:
+  - `python3 -m compileall /Users/bborn/land-o-rama/backend/app` passed.
+  - Manual scoring test execution passed.
+- Next recommended tasks:
+  - Start backend and frontend locally and verify manual scan, digest updates, and feedback persistence.
+  - Add API-level tests for opportunity list/detail and feedback endpoints.

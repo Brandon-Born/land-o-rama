@@ -9,6 +9,7 @@ This file defines how future agents should continue implementation in this repo.
 4. `/docs/SCORING_SPEC.md`
 5. `/docs/API_SPEC.md`
 6. `/docs/IMPLEMENTATION_BACKLOG.md`
+7. `/docs/WORK_LOG.md`
 
 ## Ground Rules
 - Treat documentation above as source-of-truth unless user explicitly overrides.
@@ -43,3 +44,13 @@ If changing any of these, update docs in the same PR:
 - Tests added or updated for behavior changes.
 - Docs updated where contracts changed.
 - Manual verification steps documented in task notes or PR description.
+
+## Completion Log Protocol (Mandatory)
+- Every time a task is considered complete, append an entry to `/docs/WORK_LOG.md` in the same commit.
+- Do not overwrite history; append newest entries at the bottom.
+- Each entry must include:
+  - Date (YYYY-MM-DD)
+  - Task summary
+  - Files changed (paths)
+  - Validation performed (tests/checks/manual)
+  - Next recommended tasks
