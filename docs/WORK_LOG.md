@@ -72,3 +72,40 @@
 - Next recommended tasks:
   - Start backend and frontend locally and verify manual scan, digest updates, and feedback persistence.
   - Add API-level tests for opportunity list/detail and feedback endpoints.
+
+## 2026-02-10 - End-to-End Local Runtime Validation and Toolchain Fixes
+- Task summary:
+  - Installed Python `3.13` via Homebrew to resolve backend dependency incompatibility on Python `3.14`.
+  - Recreated backend virtual environment with Python `3.13` and installed backend dependencies successfully.
+  - Installed frontend dependencies with a writable temporary npm cache.
+  - Started backend and frontend servers, executed live smoke checks, and verified:
+    - Health endpoint response.
+    - Manual daily pipeline run.
+    - Opportunities listing and detail retrieval.
+    - Latest digest retrieval.
+    - Runs history retrieval.
+    - Feedback submission endpoint.
+    - Frontend HTTP availability.
+  - Fixed frontend build script to avoid broken TypeScript project-reference step and confirmed production build succeeds.
+  - Updated docs and ignore rules for new runtime/tooling behavior.
+- Files changed:
+  - `/Users/bborn/land-o-rama/README.md`
+  - `/Users/bborn/land-o-rama/.gitignore`
+  - `/Users/bborn/land-o-rama/frontend/package.json`
+  - `/Users/bborn/land-o-rama/frontend/package-lock.json`
+  - `/Users/bborn/land-o-rama/docs/WORK_LOG.md`
+- Validation performed:
+  - `cd /Users/bborn/land-o-rama/backend && . .venv/bin/activate && pytest -q` passed (`4 passed`).
+  - API smoke tests (HTTP 200 / successful JSON responses):
+    - `GET /health`
+    - `POST /api/v1/jobs/run-daily`
+    - `GET /api/v1/opportunities`
+    - `GET /api/v1/digests/latest`
+    - `GET /api/v1/runs`
+    - `GET /api/v1/opportunities/{id}`
+    - `POST /api/v1/opportunities/{id}/feedback`
+  - `cd /Users/bborn/land-o-rama/frontend && npm run build` passed.
+- Next recommended tasks:
+  - Add API integration tests for run/digest/feedback flows to reduce reliance on manual smoke checks.
+  - Implement real provider adapters (RapidAPI listings + Regrid enrichment) behind existing mock/live boundaries.
+  - Add initial migration tooling (Alembic) so schema changes are tracked explicitly.

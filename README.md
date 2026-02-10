@@ -28,12 +28,14 @@ Implemented MVP vertical slice:
 ### 1) Backend
 ```bash
 cd /Users/bborn/land-o-rama/backend
-python3 -m venv .venv
+/opt/homebrew/bin/python3.13 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
 uvicorn app.main:app --reload --port 8000
 ```
+
+Note: Python `3.13` is required for the current dependency set. Python `3.14` will fail when building `pydantic-core`.
 
 ### 2) Frontend
 ```bash
