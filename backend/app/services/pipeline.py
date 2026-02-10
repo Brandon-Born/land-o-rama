@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from dataclasses import asdict
 from datetime import UTC, date, datetime, timedelta
 from statistics import median
 
@@ -158,7 +159,7 @@ def _persist_raw_records(db: Session, candidates: list[CandidateRecord], source_
         if candidate.source_type != source_type:
             continue
         count += 1
-        payload = candidate.__dict__
+        payload = asdict(candidate)
         if source_type == "listing":
             db.add(
                 ListingRaw(
