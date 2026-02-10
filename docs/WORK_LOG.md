@@ -279,3 +279,22 @@
   - Add operator tooling to validate auction CSV schema before scheduled runs (preflight command/UI warning).
   - Add personalization model drift metrics and retrain quality thresholds (e.g., minimum accuracy floor).
   - Add UI surfacing for last successful model training time/version and training status history.
+
+## 2026-02-10 - One-Command Local Startup (`make dev`)
+- Task summary:
+  - Added a single root command to bootstrap and run the full local app stack.
+  - Implemented `make setup` to prepare backend/frontend dependencies and apply DB migrations.
+  - Implemented `make dev` to run backend and frontend concurrently with shared shutdown handling (`Ctrl+C`).
+  - Updated Quick Start docs to make one-command startup the recommended path.
+- Files changed:
+  - `/Users/bborn/land-o-rama/Makefile`
+  - `/Users/bborn/land-o-rama/README.md`
+  - `/Users/bborn/land-o-rama/docs/WORK_LOG.md`
+- Validation performed:
+  - `cd /Users/bborn/land-o-rama && make -n setup` passed.
+  - `cd /Users/bborn/land-o-rama && make -n dev` passed.
+  - `cd /Users/bborn/land-o-rama && make setup` passed.
+  - `cd /Users/bborn/land-o-rama && make dev` started both servers successfully (backend on `127.0.0.1:8000`, frontend on `localhost:5173`), then stopped via `Ctrl+C`.
+- Next recommended tasks:
+  - Add a lightweight `make smoke` target to hit `/health` and one API endpoint after startup.
+  - Consider a `make dev-live` variant that verifies required live-provider env vars before launch.

@@ -1,5 +1,32 @@
+SHELL := /bin/bash
+PYTHON_BIN ?= /opt/homebrew/bin/python3.13
+
+.PHONY: backend-bootstrap frontend-bootstrap setup dev backend-install backend-dev frontend-install frontend-dev test test-api db-upgrade db-revision
+
+backend-bootstrap:
+	cd backend && \
+		if [ ! -d .venv ]; then $(PYTHON_BIN) -m venv .venv; fi && \
+		. .venv/bin/activate && \
+		if [ ! -x .venv/bin/uvicorn ]; then pip install -r requirements.txt; fi && \
+		if [ ! -f .env ]; then cp .env.example .env; fi && \
+		alembic upgrade head
+
+frontend-bootstrap:
+	if [ ! -d frontend/node_modules ]; then cd frontend && npm install; fi
+
+setup: backend-bootstrap frontend-bootstrap
+
+dev: setup
+	@set -eu; \
+		( cd backend && . .venv/bin/activate && uvicorn app.main:app --reload --port 8000 ) & \
+		BACK_PID=$$!; \
+		( cd frontend && npm run dev ) & \
+		FRONT_PID=$$!; \
+		trap 'kill $$BACK_PID $$FRONT_PID 2>/dev/null || true' INT TERM EXIT; \
+		wait $$BACK_PID $$FRONT_PID
+
 backend-install:
-	cd backend && /opt/homebrew/bin/python3.13 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
+	cd backend && $(PYTHON_BIN) -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
 
 backend-dev:
 	cd backend && . .venv/bin/activate && uvicorn app.main:app --reload --port 8000

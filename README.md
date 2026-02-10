@@ -26,7 +26,22 @@ Implemented MVP vertical slice:
 - Database: SQLite (local file, WAL mode).
 
 ## Quick Start
-### 1) Backend
+### 1) One Command (Recommended)
+From `/Users/bborn/land-o-rama`:
+```bash
+make dev
+```
+
+What `make dev` does:
+- Creates backend virtualenv on first run (Python `3.13`).
+- Installs backend/frontend dependencies if missing.
+- Creates `backend/.env` from `.env.example` if missing.
+- Applies Alembic migrations.
+- Starts backend (`:8000`) and frontend (`:5173`) together.
+
+Stop both services with `Ctrl+C`.
+
+### 2) Manual Backend
 ```bash
 cd /Users/bborn/land-o-rama/backend
 /opt/homebrew/bin/python3.13 -m venv .venv
@@ -47,7 +62,7 @@ source .venv/bin/activate
 alembic upgrade head
 ```
 
-### 2) Frontend
+### 3) Manual Frontend
 ```bash
 cd /Users/bborn/land-o-rama/frontend
 npm install
