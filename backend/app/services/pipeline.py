@@ -23,6 +23,7 @@ from app.models import (
 )
 from app.providers.enrichment import ParcelEnrichmentProvider, build_enrichment_provider
 from app.providers.listings import ListingProvider, build_listing_provider
+from app.providers.metrics import MarketMetricsProvider, build_market_metrics_provider
 from app.providers.mock_data import CandidateRecord, CountyMetric, mock_candidates, mock_market_metrics
 from app.scoring.engine import score_candidate
 from app.services.settings import read_settings
@@ -33,6 +34,7 @@ def run_daily_pipeline(
     *,
     listing_provider: ListingProvider | None = None,
     enrichment_provider: ParcelEnrichmentProvider | None = None,
+    metrics_provider: MarketMetricsProvider | None = None,
 ) -> SyncRun:
     settings = read_settings(db)
     runtime = get_settings()
@@ -45,16 +47,18 @@ def run_daily_pipeline(
 
     try:
         candidates: list[CandidateRecord] = []
-        market_metrics = mock_market_metrics(date.today(), settings.state)
-        _record_provider_event(db, run.id, provider="market_metrics", status="success")
+        market_metrics: list[CountyMetric] = []
 
         if settings.mock_mode:
             candidates = mock_candidates(settings.state)
+            market_metrics = mock_market_metrics(date.today(), settings.state)
             _record_provider_event(db, run.id, provider="mock_listings", status="success")
             _record_provider_event(db, run.id, provider="mock_auctions", status="success")
+            _record_provider_event(db, run.id, provider="mock_market_metrics", status="success")
         else:
             live_listing_provider = listing_provider or build_listing_provider(runtime)
             live_enrichment_provider = enrichment_provider or build_enrichment_provider(runtime)
+            live_metrics_provider = metrics_provider or build_market_metrics_provider(runtime)
 
             live_listings, listings_error = _fetch_live_listings(
                 live_listing_provider,
@@ -118,6 +122,54 @@ def run_daily_pipeline(
 
             candidates = enriched_listings + auction_candidates
 
+            candidate_counties = sorted({candidate.county for candidate in candidates})
+            market_metrics, metrics_error = _fetch_live_market_metrics(
+                live_metrics_provider,
+                state=settings.state,
+                counties=candidate_counties,
+            )
+            if not metrics_error and not market_metrics:
+                metrics_error = "Market metrics provider returned no county metrics."
+
+            if metrics_error:
+                degraded = True
+                _record_provider_event(
+                    db,
+                    run.id,
+                    provider=live_metrics_provider.provider_name,
+                    status="failed",
+                    error_summary=metrics_error,
+                )
+                market_metrics = _load_cached_market_metrics(
+                    db,
+                    state=settings.state,
+                    counties=candidate_counties,
+                    lookback_days=runtime.market_metrics_cache_lookback_days,
+                )
+                if market_metrics:
+                    _record_provider_event(
+                        db,
+                        run.id,
+                        provider="market_metrics_cache",
+                        status="degraded",
+                        error_summary="Using cached market metrics because live provider failed.",
+                    )
+                else:
+                    _record_provider_event(
+                        db,
+                        run.id,
+                        provider="market_metrics_cache",
+                        status="failed",
+                        error_summary="No cached market metrics found for requested counties.",
+                    )
+            else:
+                _record_provider_event(
+                    db,
+                    run.id,
+                    provider=live_metrics_provider.provider_name,
+                    status="success",
+                )
+
         if not candidates:
             raise RuntimeError("No candidates available from live or fallback providers.")
 
@@ -131,12 +183,17 @@ def run_daily_pipeline(
         excluded_count = 0
         scored_count = 0
 
+        counties_using_fallback_metric: set[str] = set()
         for candidate in candidates:
             if candidate.price > 6000:
                 continue
             scored_count += 1
             parcel = _upsert_parcel(db, candidate)
-            metric = metric_map.get(candidate.county) or _fallback_metric(candidate)
+            metric = metric_map.get(candidate.county)
+            if metric is None:
+                degraded = True
+                counties_using_fallback_metric.add(candidate.county)
+                metric = _fallback_metric(candidate)
             scored = score_candidate(
                 candidate,
                 metric,
@@ -184,6 +241,19 @@ def run_daily_pipeline(
         run.finished_at = datetime.now(UTC)
         db.commit()
 
+        if counties_using_fallback_metric:
+            _record_provider_event(
+                db,
+                run.id,
+                provider="market_metrics_fallback",
+                status="degraded",
+                error_summary=(
+                    "Used deterministic fallback metrics for counties: "
+                    + ", ".join(sorted(counties_using_fallback_metric))
+                ),
+            )
+            db.commit()
+
         _create_daily_digest(db, run.id)
         purge_old_data(db, months=24)
         db.commit()
@@ -201,11 +271,11 @@ def run_daily_pipeline(
 
 def purge_old_data(db: Session, months: int = 24) -> None:
     cutoff = datetime.now(UTC) - timedelta(days=30 * months)
-    db.execute(delete(ListingRaw).where(ListingRaw.created_at < cutoff))
-    db.execute(delete(AuctionRaw).where(AuctionRaw.created_at < cutoff))
-    db.execute(delete(FeatureVector).where(FeatureVector.created_at < cutoff))
-    db.execute(delete(Opportunity).where(Opportunity.created_at < cutoff))
-    db.execute(delete(Digest).where(Digest.generated_at < cutoff))
+    db.execute(delete(ListingRaw).where(ListingRaw.created_at < cutoff).execution_options(synchronize_session=False))
+    db.execute(delete(AuctionRaw).where(AuctionRaw.created_at < cutoff).execution_options(synchronize_session=False))
+    db.execute(delete(FeatureVector).where(FeatureVector.created_at < cutoff).execution_options(synchronize_session=False))
+    db.execute(delete(Opportunity).where(Opportunity.created_at < cutoff).execution_options(synchronize_session=False))
+    db.execute(delete(Digest).where(Digest.generated_at < cutoff).execution_options(synchronize_session=False))
 
 
 def latest_successful_run_id(db: Session) -> str | None:
@@ -231,6 +301,19 @@ def _fetch_live_listings(
         return [], str(exc)
 
 
+def _fetch_live_market_metrics(
+    provider: MarketMetricsProvider,
+    *,
+    state: str,
+    counties: list[str],
+) -> tuple[list[CountyMetric], str | None]:
+    try:
+        metrics = provider.fetch(state=state, counties=counties, as_of_date=date.today())
+        return metrics, None
+    except Exception as exc:  # noqa: BLE001
+        return [], str(exc)
+
+
 def _enrich_listings(
     provider: ParcelEnrichmentProvider,
     listings: list[CandidateRecord],
@@ -249,6 +332,46 @@ def _enrich_listings(
             if first_error is None:
                 first_error = str(exc)
     return enriched, first_error
+
+
+def _load_cached_market_metrics(
+    db: Session,
+    *,
+    state: str,
+    counties: list[str],
+    lookback_days: int,
+) -> list[CountyMetric]:
+    if not counties:
+        return []
+
+    cutoff = date.today() - timedelta(days=max(0, lookback_days))
+    rows = db.scalars(
+        select(MarketMetricDaily)
+        .where(
+            MarketMetricDaily.state == state,
+            MarketMetricDaily.county.in_(counties),
+            MarketMetricDaily.as_of_date >= cutoff,
+        )
+        .order_by(desc(MarketMetricDaily.as_of_date))
+    ).all()
+
+    latest_by_county: dict[str, MarketMetricDaily] = {}
+    for row in rows:
+        if row.county not in latest_by_county:
+            latest_by_county[row.county] = row
+
+    return [
+        CountyMetric(
+            county=row.county,
+            state=row.state,
+            as_of_date=row.as_of_date,
+            population_growth_1y=row.population_growth_1y,
+            jobs_growth_1y=row.jobs_growth_1y,
+            permit_growth_1y=row.permit_growth_1y,
+            turnover_index=row.turnover_index,
+        )
+        for row in latest_by_county.values()
+    ]
 
 
 def _persist_metrics(db: Session, metrics: list[CountyMetric]) -> None:

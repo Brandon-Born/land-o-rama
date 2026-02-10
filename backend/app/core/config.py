@@ -19,9 +19,11 @@ class Settings(BaseSettings):
     rapidapi_key: str | None = None
     rapidapi_host: str | None = None
     rapidapi_provider_slug: str = "land-listings"
+    rapidapi_metrics_slug: str = "county-market-metrics"
     regrid_api_key: str | None = None
     provider_timeout_seconds: float = 12.0
     provider_max_retries: int = 2
+    market_metrics_cache_lookback_days: int = 30
 
     @field_validator("default_state")
     @classmethod

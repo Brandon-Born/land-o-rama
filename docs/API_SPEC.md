@@ -71,8 +71,10 @@ Provider settings/health fields:
 - `rapidapi_configured: boolean`
 - `regrid_configured: boolean`
 - `rapidapi_provider_slug: string`
+- `rapidapi_metrics_slug: string`
 - `provider_timeout_seconds: number`
 - `provider_max_retries: number`
+- `market_metrics_cache_lookback_days: number`
 - `provider_health: ProviderEventStatus[]`
 
 ### `PUT /settings`

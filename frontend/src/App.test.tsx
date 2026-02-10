@@ -120,7 +120,7 @@ function defaultHandler(url: URL, init?: RequestInit): { status?: number; body: 
             candidates_scored: 14,
             excluded_count: 2,
             error_summary: null,
-            provider_events: [],
+            provider_events: [{ provider: "rapidapi_listings", status: "success", error_summary: null, created_at: "2026-02-10T00:01:00Z" }],
           },
         ],
       },
@@ -136,9 +136,11 @@ function defaultHandler(url: URL, init?: RequestInit): { status?: number; body: 
         rapidapi_configured: false,
         regrid_configured: false,
         rapidapi_provider_slug: "land-listings",
+        rapidapi_metrics_slug: "county-market-metrics",
         provider_timeout_seconds: 12,
         provider_max_retries: 2,
-        provider_health: [],
+        market_metrics_cache_lookback_days: 30,
+        provider_health: [{ provider: "rapidapi_listings", status: "success", error_summary: null, created_at: "2026-02-10T00:01:00Z" }],
       },
     };
   }
@@ -180,12 +182,12 @@ it("applies filters and sends mapped query params", async () => {
   render(<App />);
   await waitForOpportunitiesLoaded(calls);
 
-  await user.clear(screen.getByLabelText("County"));
-  await user.type(screen.getByLabelText("County"), "bell");
-  await user.clear(screen.getByLabelText("Min Score"));
-  await user.type(screen.getByLabelText("Min Score"), "80");
-  await user.clear(screen.getByLabelText("Max Price"));
-  await user.type(screen.getByLabelText("Max Price"), "3000");
+  await user.clear(screen.getByLabelText(/County/i));
+  await user.type(screen.getByLabelText(/County/i), "bell");
+  await user.clear(screen.getByLabelText(/Min Score/i));
+  await user.type(screen.getByLabelText(/Min Score/i), "80");
+  await user.clear(screen.getByLabelText(/Max Price/i));
+  await user.type(screen.getByLabelText(/Max Price/i), "3000");
   await user.click(screen.getByRole("button", { name: "Apply" }));
 
   await waitFor(() => {
@@ -203,10 +205,10 @@ it("resets filters to defaults", async () => {
   render(<App />);
   await waitForOpportunitiesLoaded(calls);
 
-  await user.type(screen.getByLabelText("County"), "bell");
-  await user.type(screen.getByLabelText("Min Score"), "70");
-  await user.clear(screen.getByLabelText("Max Price"));
-  await user.type(screen.getByLabelText("Max Price"), "2700");
+  await user.type(screen.getByLabelText(/County/i), "bell");
+  await user.type(screen.getByLabelText(/Min Score/i), "70");
+  await user.clear(screen.getByLabelText(/Max Price/i));
+  await user.type(screen.getByLabelText(/Max Price/i), "2700");
   await user.click(screen.getByRole("button", { name: "Reset" }));
 
   await waitFor(() => {
@@ -215,9 +217,9 @@ it("resets filters to defaults", async () => {
     expect(lastCall?.searchParams.get("min_score")).toBeNull();
     expect(lastCall?.searchParams.get("max_price")).toBe("5000");
   });
-  expect((screen.getByLabelText("County") as HTMLInputElement).value).toBe("");
-  expect((screen.getByLabelText("Min Score") as HTMLInputElement).value).toBe("");
-  expect((screen.getByLabelText("Max Price") as HTMLInputElement).value).toBe("5000");
+  expect((screen.getByLabelText(/County/i) as HTMLInputElement).value).toBe("");
+  expect((screen.getByLabelText(/Min Score/i) as HTMLInputElement).value).toBe("");
+  expect((screen.getByLabelText(/Max Price/i) as HTMLInputElement).value).toBe("5000");
 });
 
 it("supports next/prev paging and page-size changes", async () => {
@@ -233,7 +235,7 @@ it("supports next/prev paging and page-size changes", async () => {
     expect(lastCall?.searchParams.get("page_size")).toBe("25");
   });
 
-  await user.selectOptions(screen.getByLabelText("Page Size"), "50");
+  await user.selectOptions(screen.getByLabelText(/Page Size/i), "50");
   await waitFor(() => {
     const lastCall = opportunitiesCalls(calls).at(-1);
     expect(lastCall?.searchParams.get("page")).toBe("1");
@@ -278,4 +280,133 @@ it("renders error banner when opportunities request fails", async () => {
   });
   render(<App />);
   expect(await screen.findByText(/boom/i)).toBeInTheDocument();
+});
+
+it("renders provider health configuration and events", async () => {
+  installFetchMock((url, init) => {
+    if (url.pathname.endsWith("/settings")) {
+      return {
+        body: {
+          state: "TX",
+          refresh_time: "08:00",
+          mock_mode: false,
+          disclaimers_enabled: true,
+          rapidapi_configured: true,
+          regrid_configured: false,
+          rapidapi_provider_slug: "county-land-feed",
+          rapidapi_metrics_slug: "county-market-v2",
+          provider_timeout_seconds: 12,
+          provider_max_retries: 2,
+          market_metrics_cache_lookback_days: 30,
+          provider_health: [
+            { provider: "rapidapi_listings", status: "degraded", error_summary: "provider timeout", created_at: "2026-02-10T00:01:00Z" },
+            { provider: "regrid_enrichment", status: "failed", error_summary: "missing api key", created_at: "2026-02-10T00:01:30Z" },
+          ],
+        },
+      };
+    }
+    return defaultHandler(url, init);
+  });
+
+  render(<App />);
+  await waitFor(() => {
+    expect(screen.getByText("RapidAPI: Configured")).toBeInTheDocument();
+    expect(screen.getByText("Regrid: Missing Key")).toBeInTheDocument();
+    expect(screen.getByText("Slug: county-land-feed")).toBeInTheDocument();
+    expect(screen.getByText("provider timeout")).toBeInTheDocument();
+    expect(screen.getByText("missing api key")).toBeInTheDocument();
+  });
+});
+
+it("renders runs tab with degraded run provider summary", async () => {
+  const user = userEvent.setup();
+  installFetchMock((url, init) => {
+    if (url.pathname.endsWith("/runs")) {
+      return {
+        body: {
+          items: [
+            {
+              id: "run-2",
+              run_type: "daily",
+              status: "degraded",
+              started_at: "2026-02-10T00:10:00Z",
+              finished_at: "2026-02-10T00:11:00Z",
+              listings_ingested: 6,
+              auctions_ingested: 3,
+              candidates_scored: 9,
+              excluded_count: 1,
+              error_summary: "listing source degraded",
+              provider_events: [
+                { provider: "rapidapi_listings", status: "failed", error_summary: "timeout", created_at: "2026-02-10T00:10:30Z" },
+                { provider: "mock_listing_fallback", status: "degraded", error_summary: null, created_at: "2026-02-10T00:10:31Z" },
+              ],
+            },
+          ],
+        },
+      };
+    }
+    return defaultHandler(url, init);
+  });
+
+  render(<App />);
+  await screen.findByRole("heading", { name: "Top Opportunities" });
+  await user.click(screen.getByRole("button", { name: "Runs" }));
+
+  expect(await screen.findByText(/^DEGRADED\s·/i)).toBeInTheDocument();
+  expect(screen.getByText(/Providers: rapidapi_listings:failed \| mock_listing_fallback:degraded/)).toBeInTheDocument();
+});
+
+it("blocks apply when min score is out of range and allows after fix", async () => {
+  const user = userEvent.setup();
+  const { calls } = installFetchMock(defaultHandler);
+  render(<App />);
+  await waitForOpportunitiesLoaded(calls);
+
+  const applyButton = screen.getByRole("button", { name: "Apply" });
+  const beforeInvalidAttempt = opportunitiesCalls(calls).length;
+  await user.clear(screen.getByLabelText(/Min Score/i));
+  await user.type(screen.getByLabelText(/Min Score/i), "101");
+  await waitFor(() => {
+    expect(screen.getByText("Min score must be between 0 and 100.")).toBeInTheDocument();
+  });
+  expect(applyButton).toBeDisabled();
+
+  await user.click(applyButton);
+  await waitFor(() => {
+    expect(opportunitiesCalls(calls).length).toBe(beforeInvalidAttempt);
+  });
+
+  await user.clear(screen.getByLabelText(/Min Score/i));
+  await user.type(screen.getByLabelText(/Min Score/i), "90");
+  await waitFor(() => {
+    expect(screen.queryByText("Min score must be between 0 and 100.")).not.toBeInTheDocument();
+    expect(applyButton).toBeEnabled();
+  });
+
+  await user.click(applyButton);
+  await waitFor(() => {
+    const lastCall = opportunitiesCalls(calls).at(-1);
+    expect(lastCall?.searchParams.get("min_score")).toBe("90");
+  });
+});
+
+it("blocks apply for invalid max price and reset clears validation", async () => {
+  const user = userEvent.setup();
+  const { calls } = installFetchMock(defaultHandler);
+  render(<App />);
+  await waitForOpportunitiesLoaded(calls);
+
+  const applyButton = screen.getByRole("button", { name: "Apply" });
+  await user.clear(screen.getByLabelText(/Max Price/i));
+  await user.type(screen.getByLabelText(/Max Price/i), "0");
+  await waitFor(() => {
+    expect(screen.getByText("Max price must be greater than 0.")).toBeInTheDocument();
+  });
+  expect(applyButton).toBeDisabled();
+
+  await user.click(screen.getByRole("button", { name: "Reset" }));
+  await waitFor(() => {
+    expect(screen.queryByText("Max price must be greater than 0.")).not.toBeInTheDocument();
+    expect(applyButton).toBeEnabled();
+  });
 });

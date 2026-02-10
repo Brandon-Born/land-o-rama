@@ -29,6 +29,11 @@ type DashboardQuery = {
   pageSize: number;
 };
 
+type FilterErrors = {
+  minScore: string | null;
+  maxPrice: string | null;
+};
+
 const DEFAULT_QUERY: DashboardQuery = {
   county: "",
   minScore: null,
@@ -59,6 +64,36 @@ function parseOptionalNumber(value: string | null): number | null {
   if (!value) return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function validateFilters(minScoreInput: string, maxPriceInput: string): FilterErrors {
+  const minScoreText = minScoreInput.trim();
+  const maxPriceText = maxPriceInput.trim();
+
+  let minScoreError: string | null = null;
+  if (minScoreText) {
+    const minScore = Number(minScoreText);
+    if (!Number.isFinite(minScore)) {
+      minScoreError = "Min score must be a number between 0 and 100.";
+    } else if (minScore < 0 || minScore > 100) {
+      minScoreError = "Min score must be between 0 and 100.";
+    }
+  }
+
+  let maxPriceError: string | null = null;
+  if (!maxPriceText) {
+    maxPriceError = "Max price is required.";
+  } else {
+    const maxPrice = Number(maxPriceText);
+    if (!Number.isFinite(maxPrice) || maxPrice <= 0) {
+      maxPriceError = "Max price must be greater than 0.";
+    }
+  }
+
+  return {
+    minScore: minScoreError,
+    maxPrice: maxPriceError,
+  };
 }
 
 function readUrlState(): { query: DashboardQuery; tab: TabId } {
@@ -112,6 +147,7 @@ export default function App() {
     initial.query.minScore === null ? "" : String(initial.query.minScore),
   );
   const [filterMaxPrice, setFilterMaxPrice] = useState<string>(String(initial.query.maxPrice));
+  const [filterErrors, setFilterErrors] = useState<FilterErrors>({ minScore: null, maxPrice: null });
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>(initial.tab);
@@ -162,6 +198,13 @@ export default function App() {
     writeUrlState(query, activeTab);
   }, [activeTab, query]);
 
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setFilterErrors(validateFilters(filterMinScore, filterMaxPrice));
+    }, 300);
+    return () => window.clearTimeout(timeout);
+  }, [filterMinScore, filterMaxPrice]);
+
   const kpis = useMemo(() => {
     const total = opportunities.length;
     const avgScore =
@@ -171,7 +214,11 @@ export default function App() {
   }, [opportunities]);
 
   const providerHealth = useMemo(() => settings?.provider_health ?? [], [settings]);
-  const totalPages = useMemo(() => Math.max(1, Math.ceil(opportunityTotal / query.pageSize)), [opportunityTotal, query.pageSize]);
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil(opportunityTotal / query.pageSize)),
+    [opportunityTotal, query.pageSize],
+  );
+  const canApplyFilters = !filterErrors.minScore && !filterErrors.maxPrice;
 
   async function selectOpportunity(id: string) {
     try {
@@ -210,8 +257,13 @@ export default function App() {
   }
 
   function applyFilters() {
+    const nextErrors = validateFilters(filterMinScore, filterMaxPrice);
+    setFilterErrors(nextErrors);
+    if (nextErrors.minScore || nextErrors.maxPrice) {
+      return;
+    }
     const minScore = parseOptionalNumber(filterMinScore.trim() || null);
-    const maxPriceInput = parsePositiveInt(filterMaxPrice.trim() || null, DEFAULT_QUERY.maxPrice);
+    const maxPriceInput = Number(filterMaxPrice.trim());
     setQuery((previous) => ({
       ...previous,
       county: filterCounty.trim(),
@@ -225,6 +277,7 @@ export default function App() {
     setFilterCounty(DEFAULT_QUERY.county);
     setFilterMinScore("");
     setFilterMaxPrice(String(DEFAULT_QUERY.maxPrice));
+    setFilterErrors({ minScore: null, maxPrice: null });
     setQuery({ ...DEFAULT_QUERY, pageSize: query.pageSize });
   }
 
@@ -350,6 +403,7 @@ export default function App() {
                       max={100}
                       placeholder="0-100"
                     />
+                    {filterErrors.minScore && <small className="field-error">{filterErrors.minScore}</small>}
                   </label>
                   <label>
                     Max Price
@@ -360,9 +414,14 @@ export default function App() {
                       min={0}
                       step={100}
                     />
+                    {filterErrors.maxPrice ? (
+                      <small className="field-error">{filterErrors.maxPrice}</small>
+                    ) : (
+                      <small className="field-hint">USD amount, e.g. 5000</small>
+                    )}
                   </label>
                   <div className="filter-actions">
-                    <button className="primary" onClick={applyFilters}>
+                    <button className="primary" onClick={applyFilters} disabled={!canApplyFilters}>
                       Apply
                     </button>
                     <button onClick={resetFilters}>Reset</button>

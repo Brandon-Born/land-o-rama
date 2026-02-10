@@ -39,8 +39,10 @@ def read_settings(db: Session) -> SettingsResponse:
         rapidapi_configured=bool(runtime.rapidapi_key and runtime.rapidapi_host),
         regrid_configured=bool(runtime.regrid_api_key),
         rapidapi_provider_slug=runtime.rapidapi_provider_slug,
+        rapidapi_metrics_slug=runtime.rapidapi_metrics_slug,
         provider_timeout_seconds=runtime.provider_timeout_seconds,
         provider_max_retries=runtime.provider_max_retries,
+        market_metrics_cache_lookback_days=runtime.market_metrics_cache_lookback_days,
         provider_health=provider_health,
     )
 

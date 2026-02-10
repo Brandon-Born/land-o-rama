@@ -201,3 +201,37 @@
   - Add provider-health UI tests and runs-tab rendering tests to extend frontend regression coverage beyond dashboard flows.
   - Add debounce/validation UX polish for numeric filter inputs (e.g., min score bounds and max price floor messaging).
   - Implement live market metrics provider to complete non-mock live mode data pipeline quality.
+
+## 2026-02-10 - Provider/Runs UI Test Expansion + Filter Validation + Live Market Metrics Provider
+- Task summary:
+  - Added frontend regression tests for provider health rendering and runs-tab degraded-status/provider-summary display.
+  - Added numeric filter UX validation with debounce, inline error/help messaging, and Apply-button blocking for invalid inputs.
+  - Implemented live market-metrics provider adapter layer with RapidAPI integration, runtime config, and provider factory wiring.
+  - Updated pipeline market-metrics flow to use live metrics in live mode with explicit degraded fallback order: live provider -> cached DB metrics -> deterministic county fallback metrics.
+  - Added provider-event diagnostics for market-metrics live/cache/fallback outcomes and expanded settings schema with metrics config visibility.
+  - Added backend tests for market-metrics degraded/cache behavior and RapidAPI metrics retry/parse behavior.
+  - Hardened retention purge deletes with `synchronize_session=False` to avoid timezone comparison issues during ORM session synchronization.
+- Files changed:
+  - `/Users/bborn/land-o-rama/backend/.env.example`
+  - `/Users/bborn/land-o-rama/backend/app/core/config.py`
+  - `/Users/bborn/land-o-rama/backend/app/providers/__init__.py`
+  - `/Users/bborn/land-o-rama/backend/app/providers/metrics.py`
+  - `/Users/bborn/land-o-rama/backend/app/providers/rapidapi_metrics.py`
+  - `/Users/bborn/land-o-rama/backend/app/schemas/api.py`
+  - `/Users/bborn/land-o-rama/backend/app/services/pipeline.py`
+  - `/Users/bborn/land-o-rama/backend/app/services/settings.py`
+  - `/Users/bborn/land-o-rama/backend/tests/test_provider_pipeline.py`
+  - `/Users/bborn/land-o-rama/frontend/src/App.test.tsx`
+  - `/Users/bborn/land-o-rama/frontend/src/App.tsx`
+  - `/Users/bborn/land-o-rama/frontend/src/styles.css`
+  - `/Users/bborn/land-o-rama/frontend/src/types.ts`
+  - `/Users/bborn/land-o-rama/docs/API_SPEC.md`
+  - `/Users/bborn/land-o-rama/docs/WORK_LOG.md`
+- Validation performed:
+  - `cd /Users/bborn/land-o-rama/frontend && npm run test` passed (`11 passed`).
+  - `cd /Users/bborn/land-o-rama/frontend && npm run build` passed.
+  - `cd /Users/bborn/land-o-rama/backend && . .venv/bin/activate && pytest -q` passed (`22 passed`).
+- Next recommended tasks:
+  - Surface new settings fields (`rapidapi_metrics_slug`, cache lookback) in the frontend provider panel for operational transparency.
+  - Add an API/integration test specifically asserting provider event ordering and summaries on mixed degraded runs.
+  - Introduce provider-specific timeout/backoff jitter controls if live provider latency variance becomes a bottleneck.

@@ -112,8 +112,10 @@ class SettingsResponse(BaseModel):
     rapidapi_configured: bool = False
     regrid_configured: bool = False
     rapidapi_provider_slug: str = "land-listings"
+    rapidapi_metrics_slug: str = "county-market-metrics"
     provider_timeout_seconds: float = 12.0
     provider_max_retries: int = 2
+    market_metrics_cache_lookback_days: int = 30
     provider_health: list[ProviderEventStatus] = Field(default_factory=list)
 
 
