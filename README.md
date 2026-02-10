@@ -2,11 +2,13 @@
 
 Local-first investment research app for finding low-cost vacant land listings with strong 5-year upside potential.
 
-## Mission
-- Identify Texas vacant land opportunities priced at or below `$5,000`.
-- Filter out high-risk parcels using strict exclusions.
-- Rank remaining candidates with explainable, factor-based scoring.
-- Provide a web dashboard and daily digest on a local MacBook Air setup.
+## Current Status
+Implemented MVP vertical slice:
+- FastAPI backend with SQLite persistence.
+- Mock listings + auction ingestion pipeline.
+- Strict exclusion and explainable scoring engine.
+- Daily digest and run logging.
+- React web UI for dashboard, detail review, digest, and runs.
 
 ## V1 Product Decisions (Locked)
 - Geography: Texas only.
@@ -17,18 +19,47 @@ Local-first investment research app for finding low-cost vacant land listings wi
 - Explainability: Score breakdown + reason codes.
 - Risk handling: Strict hard exclusions.
 
-## Planned Stack
-- Backend: FastAPI + SQLAlchemy + Alembic + APScheduler.
+## Stack
+- Backend: FastAPI + SQLAlchemy + APScheduler.
 - Frontend: React + TypeScript + Vite.
 - Database: SQLite (local file, WAL mode).
 
-## Documentation Index
-- `/AGENTS.md`: Repo operating guide for future agents.
-- `/docs/PROJECT_SPEC.md`: Product scope and acceptance criteria.
-- `/docs/ARCHITECTURE.md`: System design and data flow.
-- `/docs/SCORING_SPEC.md`: Ranking algorithm and exclusion rules.
-- `/docs/API_SPEC.md`: Backend API contracts.
-- `/docs/IMPLEMENTATION_BACKLOG.md`: Ordered build phases and tasks.
+## Quick Start
+### 1) Backend
+```bash
+cd /Users/bborn/land-o-rama/backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+uvicorn app.main:app --reload --port 8000
+```
 
-## Immediate Next Step
-Start Phase 1 from `/docs/IMPLEMENTATION_BACKLOG.md` to scaffold backend/frontend and database migrations.
+### 2) Frontend
+```bash
+cd /Users/bborn/land-o-rama/frontend
+npm install
+npm run dev
+```
+
+Open: `http://localhost:5173`
+
+## Key API Endpoints
+- `GET /health`
+- `GET /api/v1/opportunities`
+- `GET /api/v1/opportunities/{id}`
+- `POST /api/v1/opportunities/{id}/feedback`
+- `GET /api/v1/digests/latest`
+- `GET /api/v1/digests`
+- `POST /api/v1/jobs/run-daily`
+- `GET /api/v1/runs`
+- `GET /api/v1/settings`
+- `PUT /api/v1/settings`
+
+## Documentation Index
+- `/Users/bborn/land-o-rama/AGENTS.md`: Repo operating guide for future agents.
+- `/Users/bborn/land-o-rama/docs/PROJECT_SPEC.md`: Product scope and acceptance criteria.
+- `/Users/bborn/land-o-rama/docs/ARCHITECTURE.md`: System design and data flow.
+- `/Users/bborn/land-o-rama/docs/SCORING_SPEC.md`: Ranking algorithm and exclusion rules.
+- `/Users/bborn/land-o-rama/docs/API_SPEC.md`: Backend API contracts.
+- `/Users/bborn/land-o-rama/docs/IMPLEMENTATION_BACKLOG.md`: Ordered build phases and tasks.
