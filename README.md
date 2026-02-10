@@ -5,9 +5,10 @@ Local-first investment research app for finding low-cost vacant land listings wi
 ## Current Status
 Implemented MVP vertical slice:
 - FastAPI backend with SQLite persistence.
-- Mock listings + auction ingestion pipeline.
+- Live listings (RapidAPI), live market metrics (RapidAPI), and live auction CSV ingestion pipeline.
 - Strict exclusion and explainable scoring engine.
 - Daily digest and run logging.
+- Threshold-based personalization training (`>= 50` feedback labels) with nightly retrain job.
 - React web UI for dashboard, detail review, digest, and runs.
 
 ## V1 Product Decisions (Locked)
@@ -60,6 +61,16 @@ Frontend tests:
 cd /Users/bborn/land-o-rama/frontend
 npm run test
 ```
+
+## Live Auction CSV Mode
+Drop county auction files into your configured directory (default `/Users/bborn/land-o-rama/data/auction_feeds`).
+
+Supported canonical columns:
+- `auction_id`, `parcel_key`, `county`, `state`, `price`, `acreage`, `latitude`, `longitude`
+- `zoning`, `legal_access`, `utilities_hint`, `flood_risk_level`, `wetland_risk_level`
+- `road_distance_miles`, `days_on_market`, `price_per_acre`
+
+Common aliases are accepted (`id`, `apn`, `winning_bid`, `acres`, `lat`, `lon`, etc.). Invalid rows are skipped and surfaced as degraded provider events.
 
 ## Database Migrations
 From `/Users/bborn/land-o-rama`:

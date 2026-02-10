@@ -235,3 +235,47 @@
   - Surface new settings fields (`rapidapi_metrics_slug`, cache lookback) in the frontend provider panel for operational transparency.
   - Add an API/integration test specifically asserting provider event ordering and summaries on mixed degraded runs.
   - Introduce provider-specific timeout/backoff jitter controls if live provider latency variance becomes a bottleneck.
+
+## 2026-02-10 - Live Auction CSV Ingestion + Personalization Threshold/Nightly Training
+- Task summary:
+  - Implemented live auction provider abstraction with CSV adapter, alias-aware parsing, dedupe, max-file-age filtering, and provider parse diagnostics.
+  - Integrated auction provider into daily pipeline live mode with degraded/failure semantics that continue when listing data is still available.
+  - Added personalization training/scoring service with logistic-model training from feedback labels, local model artifact persistence, threshold gating (`>=50` labels), and runtime scoring blend.
+  - Extended pipeline scoring to attach personalization metadata (`personalization_score`, `model_version`, `blend_weight`) and emit personalization provider run events.
+  - Added nightly personalization training scheduler job and startup threshold-check training path.
+  - Added Alembic migration `0002_personalization` for opportunity personalization columns and `model_training_runs` table.
+  - Expanded settings and opportunity API contracts for auction CSV config and personalization readiness/status fields.
+  - Updated frontend provider panel to surface auction source/config + personalization readiness and opportunity detail to show personalization score/model metadata.
+- Files changed:
+  - `/Users/bborn/land-o-rama/README.md`
+  - `/Users/bborn/land-o-rama/backend/.env.example`
+  - `/Users/bborn/land-o-rama/backend/alembic/versions/0002_personalization.py`
+  - `/Users/bborn/land-o-rama/backend/app/api/routes.py`
+  - `/Users/bborn/land-o-rama/backend/app/core/config.py`
+  - `/Users/bborn/land-o-rama/backend/app/main.py`
+  - `/Users/bborn/land-o-rama/backend/app/models/__init__.py`
+  - `/Users/bborn/land-o-rama/backend/app/models/entities.py`
+  - `/Users/bborn/land-o-rama/backend/app/providers/__init__.py`
+  - `/Users/bborn/land-o-rama/backend/app/providers/auctions.py`
+  - `/Users/bborn/land-o-rama/backend/app/schemas/api.py`
+  - `/Users/bborn/land-o-rama/backend/app/services/personalization.py`
+  - `/Users/bborn/land-o-rama/backend/app/services/pipeline.py`
+  - `/Users/bborn/land-o-rama/backend/app/services/settings.py`
+  - `/Users/bborn/land-o-rama/backend/tests/test_api_runs.py`
+  - `/Users/bborn/land-o-rama/backend/tests/test_migrations.py`
+  - `/Users/bborn/land-o-rama/backend/tests/test_personalization.py`
+  - `/Users/bborn/land-o-rama/backend/tests/test_provider_pipeline.py`
+  - `/Users/bborn/land-o-rama/docs/API_SPEC.md`
+  - `/Users/bborn/land-o-rama/docs/ARCHITECTURE.md`
+  - `/Users/bborn/land-o-rama/docs/WORK_LOG.md`
+  - `/Users/bborn/land-o-rama/frontend/src/App.test.tsx`
+  - `/Users/bborn/land-o-rama/frontend/src/App.tsx`
+  - `/Users/bborn/land-o-rama/frontend/src/types.ts`
+- Validation performed:
+  - `cd /Users/bborn/land-o-rama/backend && . .venv/bin/activate && pytest -q` passed (`28 passed`).
+  - `cd /Users/bborn/land-o-rama/frontend && npm run test` passed (`11 passed`).
+  - `cd /Users/bborn/land-o-rama/frontend && npm run build` passed.
+- Next recommended tasks:
+  - Add operator tooling to validate auction CSV schema before scheduled runs (preflight command/UI warning).
+  - Add personalization model drift metrics and retrain quality thresholds (e.g., minimum accuracy floor).
+  - Add UI surfacing for last successful model training time/version and training status history.

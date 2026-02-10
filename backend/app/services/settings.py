@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.models import ConfigKV, ProviderRunEvent
+from app.models import ConfigKV, Feedback, ModelTrainingRun, ProviderRunEvent
 from app.schemas.api import ProviderEventStatus, SettingsResponse, SettingsUpdate
 
 DEFAULTS = {
@@ -30,6 +31,12 @@ def read_settings(db: Session) -> SettingsResponse:
         record = db.get(ConfigKV, key)
         if record:
             values[key] = record.value
+    label_count = db.scalar(
+        select(func.count()).select_from(Feedback).where(Feedback.vote.in_(["up", "down"]))
+    ) or 0
+    latest_training = db.scalar(
+        select(ModelTrainingRun).where(ModelTrainingRun.status == "success").order_by(ModelTrainingRun.trained_at.desc()).limit(1)
+    )
     provider_health = _provider_health(db)
     return SettingsResponse(
         state=values.get("state", DEFAULTS["state"]),
@@ -40,9 +47,17 @@ def read_settings(db: Session) -> SettingsResponse:
         regrid_configured=bool(runtime.regrid_api_key),
         rapidapi_provider_slug=runtime.rapidapi_provider_slug,
         rapidapi_metrics_slug=runtime.rapidapi_metrics_slug,
+        auction_source_mode=runtime.auction_source_mode,
+        auction_csv_dir=runtime.auction_csv_dir,
+        auction_csv_glob=runtime.auction_csv_glob,
+        auction_max_file_age_days=runtime.auction_max_file_age_days,
         provider_timeout_seconds=runtime.provider_timeout_seconds,
         provider_max_retries=runtime.provider_max_retries,
         market_metrics_cache_lookback_days=runtime.market_metrics_cache_lookback_days,
+        personalization_ready=bool(latest_training and label_count >= runtime.personalization_threshold),
+        feedback_labels_count=label_count,
+        personalization_threshold=runtime.personalization_threshold,
+        personalization_blend_weight=runtime.personalization_blend_weight,
         provider_health=provider_health,
     )
 

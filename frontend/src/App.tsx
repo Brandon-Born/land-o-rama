@@ -347,7 +347,19 @@ export default function App() {
             <div className="provider-meta">
               <span>RapidAPI: {settings?.rapidapi_configured ? "Configured" : "Missing Key/Host"}</span>
               <span>Regrid: {settings?.regrid_configured ? "Configured" : "Missing Key"}</span>
-              <span>Slug: {settings?.rapidapi_provider_slug ?? "n/a"}</span>
+              <span>Listing Slug: {settings?.rapidapi_provider_slug ?? "n/a"}</span>
+              <span>Metrics Slug: {settings?.rapidapi_metrics_slug ?? "n/a"}</span>
+              <span>Auction Source: {settings?.auction_source_mode ?? "n/a"}</span>
+              <span>CSV Dir: {settings?.auction_csv_dir ?? "n/a"}</span>
+              <span>CSV Glob: {settings?.auction_csv_glob ?? "n/a"}</span>
+              <span>CSV Age Days: {settings?.auction_max_file_age_days ?? 0}</span>
+              <span>Metrics Cache Days: {settings?.market_metrics_cache_lookback_days ?? 0}</span>
+              <span>
+                Personalization:{" "}
+                {settings?.personalization_ready
+                  ? `Ready (${settings?.feedback_labels_count ?? 0}/${settings?.personalization_threshold ?? 50})`
+                  : `Not Ready (${settings?.feedback_labels_count ?? 0}/${settings?.personalization_threshold ?? 50})`}
+              </span>
             </div>
             {providerHealth.length === 0 ? (
               <p>No provider events yet.</p>
@@ -497,6 +509,17 @@ export default function App() {
                         {selected.score_breakdown.final_score.toFixed(2)}
                       </strong>
                     </div>
+                    <div className="score-line">
+                      <span>Personalization Score</span>
+                      <strong>
+                        {selected.score_breakdown.personalization_score === null
+                          ? "n/a"
+                          : selected.score_breakdown.personalization_score.toFixed(2)}
+                      </strong>
+                    </div>
+                    <p>
+                      Model: {selected.model_version ?? "base-only"} · Blend Weight: {selected.blend_weight.toFixed(2)}
+                    </p>
                     <ul className="reason-list">
                       {selected.reason_codes.map((reason) => (
                         <li key={reason.code}>

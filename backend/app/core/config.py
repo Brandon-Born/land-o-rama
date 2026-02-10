@@ -15,15 +15,23 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173"
     default_state: str = "TX"
     refresh_time: str = "08:00"
+    personalization_retrain_time: str = "02:30"
     mock_mode: bool = True
     rapidapi_key: str | None = None
     rapidapi_host: str | None = None
     rapidapi_provider_slug: str = "land-listings"
     rapidapi_metrics_slug: str = "county-market-metrics"
+    auction_source_mode: str = "mock"
+    auction_csv_dir: str = "/Users/bborn/land-o-rama/data/auction_feeds"
+    auction_csv_glob: str = "*.csv"
+    auction_max_file_age_days: int = 14
     regrid_api_key: str | None = None
     provider_timeout_seconds: float = 12.0
     provider_max_retries: int = 2
     market_metrics_cache_lookback_days: int = 30
+    personalization_threshold: int = 50
+    personalization_blend_weight: float = 0.15
+    personalization_model_path: str = "/Users/bborn/land-o-rama/data/models/personalization_v1.joblib"
 
     @field_validator("default_state")
     @classmethod

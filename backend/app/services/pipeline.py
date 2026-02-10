@@ -21,11 +21,13 @@ from app.models import (
     RiskFlag,
     SyncRun,
 )
+from app.providers.auctions import AuctionProvider, build_auction_provider
 from app.providers.enrichment import ParcelEnrichmentProvider, build_enrichment_provider
 from app.providers.listings import ListingProvider, build_listing_provider
 from app.providers.metrics import MarketMetricsProvider, build_market_metrics_provider
 from app.providers.mock_data import CandidateRecord, CountyMetric, mock_candidates, mock_market_metrics
 from app.scoring.engine import score_candidate
+from app.services.personalization import count_labels, load_active_model, score_personalization
 from app.services.settings import read_settings
 
 
@@ -33,6 +35,7 @@ def run_daily_pipeline(
     db: Session,
     *,
     listing_provider: ListingProvider | None = None,
+    auction_provider: AuctionProvider | None = None,
     enrichment_provider: ParcelEnrichmentProvider | None = None,
     metrics_provider: MarketMetricsProvider | None = None,
 ) -> SyncRun:
@@ -46,8 +49,27 @@ def run_daily_pipeline(
     degraded = False
 
     try:
-        candidates: list[CandidateRecord] = []
+        listing_candidates: list[CandidateRecord] = []
+        auction_candidates: list[CandidateRecord] = []
         market_metrics: list[CountyMetric] = []
+        candidates: list[CandidateRecord] = []
+
+        label_count = count_labels(db)
+        personalization_model = None
+        if label_count >= runtime.personalization_threshold:
+            personalization_model = load_active_model()
+            if personalization_model is None:
+                degraded = True
+                _record_provider_event(
+                    db,
+                    run.id,
+                    provider="personalization_model",
+                    status="degraded",
+                    error_summary=(
+                        f"Threshold met ({label_count} labels) but no active model artifact found at "
+                        f"{runtime.personalization_model_path}."
+                    ),
+                )
 
         if settings.mock_mode:
             candidates = mock_candidates(settings.state)
@@ -57,10 +79,11 @@ def run_daily_pipeline(
             _record_provider_event(db, run.id, provider="mock_market_metrics", status="success")
         else:
             live_listing_provider = listing_provider or build_listing_provider(runtime)
+            live_auction_provider = auction_provider or build_auction_provider(runtime)
             live_enrichment_provider = enrichment_provider or build_enrichment_provider(runtime)
             live_metrics_provider = metrics_provider or build_market_metrics_provider(runtime)
 
-            live_listings, listings_error = _fetch_live_listings(
+            listing_candidates, listings_error = _fetch_live_listings(
                 live_listing_provider,
                 state=settings.state,
                 max_price=6000.0,
@@ -75,7 +98,7 @@ def run_daily_pipeline(
                     error_summary=listings_error,
                 )
                 # Keep app productive with mock listing fallback when live feed is unavailable.
-                live_listings = [
+                listing_candidates = [
                     candidate
                     for candidate in mock_candidates(settings.state)
                     if candidate.source_type == "listing" and candidate.price <= 6000
@@ -95,7 +118,7 @@ def run_daily_pipeline(
                     status="success",
                 )
 
-            enriched_listings, enrichment_error = _enrich_listings(live_enrichment_provider, live_listings)
+            listing_candidates, enrichment_error = _enrich_listings(live_enrichment_provider, listing_candidates)
             if enrichment_error:
                 degraded = True
                 _record_provider_event(
@@ -113,14 +136,38 @@ def run_daily_pipeline(
                     status="success",
                 )
 
-            auction_candidates = [
-                candidate
-                for candidate in mock_candidates(settings.state)
-                if candidate.source_type == "auction"
-            ]
-            _record_provider_event(db, run.id, provider="mock_auctions", status="success")
+            auction_candidates, auctions_error, auctions_warning = _fetch_live_auctions(
+                live_auction_provider,
+                state=settings.state,
+                max_price=6000.0,
+            )
+            if auctions_error:
+                degraded = True
+                _record_provider_event(
+                    db,
+                    run.id,
+                    provider=live_auction_provider.provider_name,
+                    status="failed",
+                    error_summary=auctions_error,
+                )
+            elif auctions_warning:
+                degraded = True
+                _record_provider_event(
+                    db,
+                    run.id,
+                    provider=live_auction_provider.provider_name,
+                    status="degraded",
+                    error_summary=auctions_warning,
+                )
+            else:
+                _record_provider_event(
+                    db,
+                    run.id,
+                    provider=live_auction_provider.provider_name,
+                    status="success",
+                )
 
-            candidates = enriched_listings + auction_candidates
+            candidates = listing_candidates + auction_candidates
 
             candidate_counties = sorted({candidate.county for candidate in candidates})
             market_metrics, metrics_error = _fetch_live_market_metrics(
@@ -226,11 +273,33 @@ def run_daily_pipeline(
                 acreage=candidate.acreage,
                 base_score=scored.base_score,
                 final_score=scored.final_score,
+                personalization_score=None,
+                model_version=None,
+                blend_weight=runtime.personalization_blend_weight,
                 is_excluded=scored.is_excluded,
                 exclusion_reason=scored.exclusion_reason,
                 reason_codes=scored.reason_codes,
                 caution_code=scored.caution_code,
             )
+            if not scored.is_excluded and personalization_model is not None:
+                personalization_score = score_personalization(
+                    personalization_model,
+                    market_growth_score=scored.market_growth_score,
+                    development_pressure_score=scored.development_pressure_score,
+                    accessibility_score=scored.accessibility_score,
+                    liquidity_score=scored.liquidity_score,
+                    risk_penalty_score=scored.risk_penalty_score,
+                    base_score=scored.base_score,
+                    price=candidate.price,
+                    acreage=candidate.acreage,
+                )
+                blended = (
+                    (1 - runtime.personalization_blend_weight) * scored.final_score
+                    + runtime.personalization_blend_weight * personalization_score
+                )
+                opportunity.final_score = round(max(0.0, min(100.0, blended)), 2)
+                opportunity.personalization_score = personalization_score
+                opportunity.model_version = personalization_model.version
             db.add(opportunity)
 
             _persist_risk_flags(db, run.id, parcel.id, candidate, scored.is_excluded)
@@ -251,6 +320,15 @@ def run_daily_pipeline(
                     "Used deterministic fallback metrics for counties: "
                     + ", ".join(sorted(counties_using_fallback_metric))
                 ),
+            )
+            db.commit()
+        if personalization_model is not None:
+            _record_provider_event(
+                db,
+                run.id,
+                provider="personalization_model",
+                status="success",
+                error_summary=f"Applied model {personalization_model.version} with {label_count} labels.",
             )
             db.commit()
 
@@ -299,6 +377,27 @@ def _fetch_live_listings(
         return listings, None
     except Exception as exc:  # noqa: BLE001
         return [], str(exc)
+
+
+def _fetch_live_auctions(
+    provider: AuctionProvider,
+    *,
+    state: str,
+    max_price: float,
+) -> tuple[list[CandidateRecord], str | None, str | None]:
+    try:
+        auctions = provider.fetch(state=state, max_price=max_price)
+        stats = getattr(provider, "last_stats", None)
+        warning: str | None = None
+        if stats is not None and getattr(stats, "rejected_rows", 0) > 0:
+            samples = getattr(stats, "error_samples", [])
+            details = f"rejected_rows={stats.rejected_rows}"
+            if samples:
+                details += f"; samples={'; '.join(samples)}"
+            warning = details
+        return auctions, None, warning
+    except Exception as exc:  # noqa: BLE001
+        return [], str(exc), None
 
 
 def _fetch_live_market_metrics(

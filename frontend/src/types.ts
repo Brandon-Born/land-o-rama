@@ -26,6 +26,7 @@ export type ScoreBreakdown = {
   risk_penalty_score: number;
   base_score: number;
   final_score: number;
+  personalization_score: number | null;
 };
 
 export type OpportunityDetail = {
@@ -41,6 +42,8 @@ export type OpportunityDetail = {
   exclusion_reason: string | null;
   reason_codes: Array<{ code: string; label: string; direction: string; impact: number }>;
   caution_code: { code: string; label: string; direction: string; impact: number } | null;
+  model_version: string | null;
+  blend_weight: number;
   score_breakdown: ScoreBreakdown;
   created_at: string;
 };
@@ -83,9 +86,17 @@ export type SettingsResponse = {
   regrid_configured: boolean;
   rapidapi_provider_slug: string;
   rapidapi_metrics_slug: string;
+  auction_source_mode: string;
+  auction_csv_dir: string;
+  auction_csv_glob: string;
+  auction_max_file_age_days: number;
   provider_timeout_seconds: number;
   provider_max_retries: number;
   market_metrics_cache_lookback_days: number;
+  personalization_ready: boolean;
+  feedback_labels_count: number;
+  personalization_threshold: number;
+  personalization_blend_weight: number;
   provider_health: ProviderEventStatus[];
 };
 

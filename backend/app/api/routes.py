@@ -113,6 +113,8 @@ def get_opportunity(opportunity_id: str, db: Session = Depends(get_db)) -> Oppor
         exclusion_reason=opportunity.exclusion_reason,
         reason_codes=opportunity.reason_codes,
         caution_code=opportunity.caution_code,
+        model_version=opportunity.model_version,
+        blend_weight=opportunity.blend_weight,
         score_breakdown=ScoreBreakdown(
             market_growth_score=feature.market_growth_score,
             development_pressure_score=feature.development_pressure_score,
@@ -121,6 +123,7 @@ def get_opportunity(opportunity_id: str, db: Session = Depends(get_db)) -> Oppor
             risk_penalty_score=feature.risk_penalty_score,
             base_score=opportunity.base_score,
             final_score=opportunity.final_score,
+            personalization_score=opportunity.personalization_score,
         ),
         created_at=opportunity.created_at,
     )

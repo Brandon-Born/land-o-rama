@@ -26,6 +26,7 @@ class ScoreBreakdown(BaseModel):
     risk_penalty_score: float
     base_score: float
     final_score: float
+    personalization_score: float | None = None
 
 
 class OpportunityDetail(BaseModel):
@@ -41,6 +42,8 @@ class OpportunityDetail(BaseModel):
     exclusion_reason: str | None
     reason_codes: list[dict]
     caution_code: dict | None
+    model_version: str | None = None
+    blend_weight: float = 0.15
     score_breakdown: ScoreBreakdown
     created_at: datetime
 
@@ -113,9 +116,17 @@ class SettingsResponse(BaseModel):
     regrid_configured: bool = False
     rapidapi_provider_slug: str = "land-listings"
     rapidapi_metrics_slug: str = "county-market-metrics"
+    auction_source_mode: str = "mock"
+    auction_csv_dir: str = "/Users/bborn/land-o-rama/data/auction_feeds"
+    auction_csv_glob: str = "*.csv"
+    auction_max_file_age_days: int = 14
     provider_timeout_seconds: float = 12.0
     provider_max_retries: int = 2
     market_metrics_cache_lookback_days: int = 30
+    personalization_ready: bool = False
+    feedback_labels_count: int = 0
+    personalization_threshold: int = 50
+    personalization_blend_weight: float = 0.15
     provider_health: list[ProviderEventStatus] = Field(default_factory=list)
 
 

@@ -29,6 +29,7 @@ def test_alembic_upgrade_creates_required_tables(test_db_url: str) -> None:
         "digests",
         "config_kv",
         "provider_run_events",
+        "model_training_runs",
     }
     assert expected.issubset(tables)
     engine.dispose()

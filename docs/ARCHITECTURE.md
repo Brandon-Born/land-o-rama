@@ -10,9 +10,10 @@ Land-O-Rama is a local-first web application with:
 ## High-Level Components
 - `Provider Adapters`
   - Listings adapter (RapidAPI in live mode, fixtures in mock mode).
-  - Auctions adapter (mock in current sprint; live county/tax feeds deferred).
+  - Auctions adapter (CSV ingestion in live mode, mock fallback in mock mode).
   - Parcel enrichment adapter (Regrid in live mode, noop in mock mode).
-  - Trend metrics adapter (public macro datasets).
+  - Trend metrics adapter (RapidAPI in live mode, mock fallback in mock mode).
+  - Personalization model adapter (local artifact scoring with threshold gating).
 - `Normalization + Dedupe`
   - Converts source payloads into canonical entities.
   - Handles parcel key resolution and duplicate suppression.
@@ -27,7 +28,7 @@ Land-O-Rama is a local-first web application with:
   - Write endpoint for feedback.
   - Operational endpoints for runs/settings.
 - `Scheduler`
-  - Executes daily pipeline and retention purge.
+  - Executes daily pipeline, nightly personalization training, and retention purge.
 
 ## Data Flow
 1. Pull new listing and auction data from provider adapters.

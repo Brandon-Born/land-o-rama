@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+
+from app.models import ProviderRunEvent, SyncRun
+
 
 def test_run_daily_creates_successful_run(client) -> None:
     run_response = client.post("/api/v1/jobs/run-daily")
@@ -17,3 +21,49 @@ def test_run_daily_creates_successful_run(client) -> None:
     assert run["status"] in {"success", "degraded", "failed"}
     assert run["listings_ingested"] >= 0
     assert run["auctions_ingested"] >= 0
+
+
+def test_runs_endpoint_orders_provider_events_desc_for_degraded_run(client, session_factory) -> None:
+    with session_factory() as session:
+        run = SyncRun(
+            run_type="daily",
+            status="degraded",
+            started_at=datetime.now(UTC) - timedelta(minutes=5),
+            finished_at=datetime.now(UTC) - timedelta(minutes=4),
+            listings_ingested=4,
+            auctions_ingested=2,
+            candidates_scored=6,
+            excluded_count=1,
+            error_summary="mixed provider degradation",
+        )
+        session.add(run)
+        session.flush()
+        run_id = run.id
+        base = datetime.now(UTC)
+        session.add_all(
+            [
+                ProviderRunEvent(run_id=run.id, provider="rapidapi_listings", status="failed", created_at=base),
+                ProviderRunEvent(
+                    run_id=run.id,
+                    provider="csv_auctions",
+                    status="degraded",
+                    created_at=base + timedelta(seconds=1),
+                ),
+                ProviderRunEvent(
+                    run_id=run.id,
+                    provider="market_metrics_cache",
+                    status="degraded",
+                    created_at=base + timedelta(seconds=2),
+                ),
+            ]
+        )
+        session.commit()
+
+    runs_response = client.get("/api/v1/runs")
+    assert runs_response.status_code == 200
+    items = runs_response.json()["items"]
+    matching = next(item for item in items if item["id"] == run_id)
+    assert matching["status"] == "degraded"
+    assert matching["provider_events"][0]["provider"] == "market_metrics_cache"
+    assert matching["provider_events"][1]["provider"] == "csv_auctions"
+    assert matching["provider_events"][2]["provider"] == "rapidapi_listings"

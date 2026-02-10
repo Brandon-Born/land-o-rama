@@ -122,6 +122,9 @@ class Opportunity(Base):
     acreage: Mapped[float] = mapped_column(Float)
     base_score: Mapped[float] = mapped_column(Float)
     final_score: Mapped[float] = mapped_column(Float, index=True)
+    personalization_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    model_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    blend_weight: Mapped[float] = mapped_column(Float, default=0.15)
     is_excluded: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     exclusion_reason: Mapped[str | None] = mapped_column(String(256), nullable=True)
     reason_codes: Mapped[list[dict]] = mapped_column(JSON, default=list)
@@ -182,3 +185,16 @@ class ProviderRunEvent(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
 
     run: Mapped[SyncRun] = relationship(back_populates="provider_events")
+
+
+class ModelTrainingRun(Base):
+    __tablename__ = "model_training_runs"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    model_version: Mapped[str] = mapped_column(String(64), index=True)
+    trained_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    labels_used: Mapped[int] = mapped_column(Integer)
+    status: Mapped[str] = mapped_column(String(32), index=True)
+    metrics_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    artifact_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    error_summary: Mapped[str | None] = mapped_column(Text, nullable=True)

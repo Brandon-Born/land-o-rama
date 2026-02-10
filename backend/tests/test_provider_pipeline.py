@@ -7,9 +7,11 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
+from app.core.config import get_settings
 from app.main import create_app
 from app.models import ConfigKV, MarketMetricDaily, ProviderRunEvent, SyncRun
 from app.providers.mock_data import CandidateRecord, CountyMetric
+from app.providers.auctions import AuctionFetchStats, CsvAuctionProvider
 from app.providers.rapidapi_listings import RapidAPIListingProvider
 from app.providers.rapidapi_metrics import RapidAPIMarketMetricsProvider
 from app.services.pipeline import run_daily_pipeline
@@ -65,6 +67,64 @@ class StaticListingProvider:
         ]
 
 
+class StaticAuctionProvider:
+    provider_name = "static_auction_provider"
+    last_stats = AuctionFetchStats(scanned_rows=1, accepted_rows=1, rejected_rows=0)
+
+    def fetch(self, state: str, max_price: float) -> list[CandidateRecord]:  # noqa: ARG002
+        return [
+            CandidateRecord(
+                source_type="auction",
+                source=self.provider_name,
+                external_id="AUC-STATIC-1",
+                parcel_key="TX-BELL-AUC-STATIC-1",
+                county="Bell",
+                state=state,
+                price=1800.0,
+                acreage=0.30,
+                latitude=31.11,
+                longitude=-97.72,
+                zoning="single_family",
+                legal_access=True,
+                utilities_hint="unknown",
+                flood_risk_level=2,
+                wetland_risk_level=1,
+                road_distance_miles=0.5,
+                days_on_market=7,
+                price_per_acre=6000.0,
+            )
+        ]
+
+
+class PartialAuctionProvider:
+    provider_name = "csv_auctions"
+    last_stats = AuctionFetchStats(
+        scanned_rows=4,
+        accepted_rows=2,
+        rejected_rows=2,
+        error_samples=["row 3 missing parcel_key", "row 6 invalid price"],
+    )
+
+    def fetch(self, state: str, max_price: float) -> list[CandidateRecord]:  # noqa: ARG002
+        return StaticAuctionProvider().fetch(state=state, max_price=max_price)
+
+
+class FailingAuctionProvider:
+    provider_name = "csv_auctions"
+    last_stats = AuctionFetchStats(scanned_rows=0, accepted_rows=0, rejected_rows=0)
+
+    def fetch(self, state: str, max_price: float) -> list[CandidateRecord]:  # noqa: ARG002
+        raise RuntimeError("auction CSV not found")
+
+
+class EmptyAuctionProvider:
+    provider_name = "empty_auction_provider"
+    last_stats = AuctionFetchStats(scanned_rows=0, accepted_rows=0, rejected_rows=0)
+
+    def fetch(self, state: str, max_price: float) -> list[CandidateRecord]:  # noqa: ARG002
+        return []
+
+
 class FailingMetricsProvider:
     provider_name = "failing_metrics_provider"
 
@@ -77,6 +137,24 @@ class EmptyMetricsProvider:
 
     def fetch(self, *, state: str, counties: list[str], as_of_date: date) -> list[CountyMetric]:  # noqa: ARG002
         return []
+
+
+class StaticMetricsProvider:
+    provider_name = "static_metrics_provider"
+
+    def fetch(self, *, state: str, counties: list[str], as_of_date: date) -> list[CountyMetric]:  # noqa: ARG002
+        return [
+            CountyMetric(
+                county=county.title(),
+                state=state,
+                as_of_date=as_of_date,
+                population_growth_1y=2.0,
+                jobs_growth_1y=1.5,
+                permit_growth_1y=2.2,
+                turnover_index=60.0,
+            )
+            for county in counties
+        ]
 
 
 def test_missing_provider_keys_does_not_crash_app_startup() -> None:
@@ -107,6 +185,8 @@ def test_live_listing_failure_marks_run_degraded(session_factory) -> None:
 
 
 def test_full_provider_outage_with_no_fallback_candidates_fails_run(session_factory, monkeypatch) -> None:
+    monkeypatch.setenv("LANDORAMA_AUCTION_SOURCE_MODE", "csv")
+    get_settings.cache_clear()
     with session_factory() as db:
         ensure_default_settings(db)
         db.get(ConfigKV, "mock_mode").value = "false"
@@ -118,7 +198,9 @@ def test_full_provider_outage_with_no_fallback_candidates_fails_run(session_fact
             run_daily_pipeline(
                 db,
                 listing_provider=EmptyListingProvider(),
+                auction_provider=EmptyAuctionProvider(),
                 enrichment_provider=NoopEnrichmentProvider(),
+                metrics_provider=EmptyMetricsProvider(),
             )
 
         latest_event = db.scalar(select(ProviderRunEvent).order_by(ProviderRunEvent.created_at.desc()))
@@ -126,6 +208,7 @@ def test_full_provider_outage_with_no_fallback_candidates_fails_run(session_fact
         run = db.get(SyncRun, latest_event.run_id)
         assert run is not None
         assert run.status == "failed"
+    get_settings.cache_clear()
 
 
 def test_rapidapi_retry_attempts_and_last_error(monkeypatch) -> None:
@@ -296,3 +379,64 @@ def test_rapidapi_metrics_parses_list_payload(monkeypatch) -> None:
     assert metrics[0].county == "Travis"
     assert metrics[0].population_growth_1y == pytest.approx(2.5)
     assert metrics[0].jobs_growth_1y == pytest.approx(1.9)
+
+
+def test_csv_auction_provider_parses_aliases_and_dedupes(tmp_path) -> None:
+    csv_path = tmp_path / "county_sale.csv"
+    csv_path.write_text(
+        "\n".join(
+            [
+                "id,apn,county_name,state,winning_bid,acres,lat,lon,zoning,road_access,utilities,flood_risk,wetland_risk,road_distance,dom",
+                "A1,PK-1,Travis,TX,2100,0.25,30.2,-97.7,residential,true,nearby,2,1,0.5,10",
+                "A1,PK-1,Travis,TX,2100,0.25,30.2,-97.7,residential,true,nearby,2,1,0.5,10",
+                "A2,,Travis,TX,2200,0.30,30.1,-97.6,residential,true,nearby,2,1,0.5,12",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    provider = CsvAuctionProvider(csv_dir=tmp_path, glob_pattern="*.csv", max_file_age_days=30)
+    candidates = provider.fetch(state="TX", max_price=5000)
+    assert len(candidates) == 1
+    assert candidates[0].external_id == "A1"
+    assert provider.last_stats.rejected_rows == 2
+
+
+def test_auction_partial_parse_marks_run_degraded(session_factory, monkeypatch) -> None:
+    with session_factory() as db:
+        ensure_default_settings(db)
+        db.get(ConfigKV, "mock_mode").value = "false"
+        db.commit()
+
+        monkeypatch.setattr("app.services.pipeline.mock_candidates", lambda state: [])
+
+        run = run_daily_pipeline(
+            db,
+            listing_provider=StaticListingProvider(),
+            auction_provider=PartialAuctionProvider(),
+            enrichment_provider=NoopEnrichmentProvider(),
+            metrics_provider=StaticMetricsProvider(),
+        )
+        assert run.status == "degraded"
+        events = db.scalars(select(ProviderRunEvent).where(ProviderRunEvent.run_id == run.id)).all()
+        assert any(event.provider == "csv_auctions" and event.status == "degraded" for event in events)
+
+
+def test_auction_failure_keeps_run_alive_when_listings_exist(session_factory, monkeypatch) -> None:
+    with session_factory() as db:
+        ensure_default_settings(db)
+        db.get(ConfigKV, "mock_mode").value = "false"
+        db.commit()
+
+        monkeypatch.setattr("app.services.pipeline.mock_candidates", lambda state: [])
+
+        run = run_daily_pipeline(
+            db,
+            listing_provider=StaticListingProvider(),
+            auction_provider=FailingAuctionProvider(),
+            enrichment_provider=NoopEnrichmentProvider(),
+            metrics_provider=StaticMetricsProvider(),
+        )
+        assert run.status == "degraded"
+        assert run.listings_ingested > 0
+        assert run.auctions_ingested == 0

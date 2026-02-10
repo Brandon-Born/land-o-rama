@@ -72,9 +72,17 @@ Provider settings/health fields:
 - `regrid_configured: boolean`
 - `rapidapi_provider_slug: string`
 - `rapidapi_metrics_slug: string`
+- `auction_source_mode: string`
+- `auction_csv_dir: string`
+- `auction_csv_glob: string`
+- `auction_max_file_age_days: number`
 - `provider_timeout_seconds: number`
 - `provider_max_retries: number`
 - `market_metrics_cache_lookback_days: number`
+- `personalization_ready: boolean`
+- `feedback_labels_count: number`
+- `personalization_threshold: number`
+- `personalization_blend_weight: number`
 - `provider_health: ProviderEventStatus[]`
 
 ### `PUT /settings`
@@ -84,9 +92,9 @@ Updates non-secret runtime settings (schedule time, provider toggles).
 - `OpportunityListItem`
   - `id`, `county`, `state`, `price`, `acreage`, `final_score`, `base_score`, `source_type`, `created_at`
 - `OpportunityDetail`
-  - `id`, `parcel_id`, `county`, `state`, `price`, `acreage`, `source_type`, `source_id`, `is_excluded`, `reason_codes`, `caution_code`, `score_breakdown`, `created_at`
+  - `id`, `parcel_id`, `county`, `state`, `price`, `acreage`, `source_type`, `source_id`, `is_excluded`, `reason_codes`, `caution_code`, `model_version`, `blend_weight`, `score_breakdown`, `created_at`
 - `ScoreBreakdown`
-  - `market_growth_score`, `development_pressure_score`, `accessibility_score`, `liquidity_score`, `risk_penalty_score`, `base_score`, `final_score`
+  - `market_growth_score`, `development_pressure_score`, `accessibility_score`, `liquidity_score`, `risk_penalty_score`, `base_score`, `final_score`, `personalization_score`
 - `ReasonCode`
   - `code`, `label`, `direction` (`positive` or `caution`), `impact`
 - `RunStatus`

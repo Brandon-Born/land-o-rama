@@ -58,7 +58,10 @@ function detailFor(id: string) {
       risk_penalty_score: 20,
       base_score: item.base_score,
       final_score: item.final_score,
+      personalization_score: null,
     },
+    model_version: null,
+    blend_weight: 0.15,
     created_at: item.created_at,
   };
 }
@@ -137,9 +140,17 @@ function defaultHandler(url: URL, init?: RequestInit): { status?: number; body: 
         regrid_configured: false,
         rapidapi_provider_slug: "land-listings",
         rapidapi_metrics_slug: "county-market-metrics",
+        auction_source_mode: "mock",
+        auction_csv_dir: "/Users/bborn/land-o-rama/data/auction_feeds",
+        auction_csv_glob: "*.csv",
+        auction_max_file_age_days: 14,
         provider_timeout_seconds: 12,
         provider_max_retries: 2,
         market_metrics_cache_lookback_days: 30,
+        personalization_ready: false,
+        feedback_labels_count: 0,
+        personalization_threshold: 50,
+        personalization_blend_weight: 0.15,
         provider_health: [{ provider: "rapidapi_listings", status: "success", error_summary: null, created_at: "2026-02-10T00:01:00Z" }],
       },
     };
@@ -295,9 +306,17 @@ it("renders provider health configuration and events", async () => {
           regrid_configured: false,
           rapidapi_provider_slug: "county-land-feed",
           rapidapi_metrics_slug: "county-market-v2",
+          auction_source_mode: "csv",
+          auction_csv_dir: "/tmp/auctions",
+          auction_csv_glob: "*.csv",
+          auction_max_file_age_days: 10,
           provider_timeout_seconds: 12,
           provider_max_retries: 2,
           market_metrics_cache_lookback_days: 30,
+          personalization_ready: true,
+          feedback_labels_count: 75,
+          personalization_threshold: 50,
+          personalization_blend_weight: 0.15,
           provider_health: [
             { provider: "rapidapi_listings", status: "degraded", error_summary: "provider timeout", created_at: "2026-02-10T00:01:00Z" },
             { provider: "regrid_enrichment", status: "failed", error_summary: "missing api key", created_at: "2026-02-10T00:01:30Z" },
@@ -312,7 +331,10 @@ it("renders provider health configuration and events", async () => {
   await waitFor(() => {
     expect(screen.getByText("RapidAPI: Configured")).toBeInTheDocument();
     expect(screen.getByText("Regrid: Missing Key")).toBeInTheDocument();
-    expect(screen.getByText("Slug: county-land-feed")).toBeInTheDocument();
+    expect(screen.getByText("Listing Slug: county-land-feed")).toBeInTheDocument();
+    expect(screen.getByText("Metrics Slug: county-market-v2")).toBeInTheDocument();
+    expect(screen.getByText("Auction Source: csv")).toBeInTheDocument();
+    expect(screen.getByText(/Personalization: Ready/i)).toBeInTheDocument();
     expect(screen.getByText("provider timeout")).toBeInTheDocument();
     expect(screen.getByText("missing api key")).toBeInTheDocument();
   });

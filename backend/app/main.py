@@ -13,6 +13,7 @@ from app.core.config import get_settings
 from app.db.session import SessionLocal
 from app.models import SyncRun
 from app.services.pipeline import run_daily_pipeline
+from app.services.personalization import train_if_threshold_met
 from app.services.settings import ensure_default_settings
 
 
@@ -29,7 +30,11 @@ def create_app(
         with SessionLocal() as db:
             run_daily_pipeline(db)
 
-    def _schedule_daily_job() -> None:
+    def _run_personalization_job_wrapper() -> None:
+        with SessionLocal() as db:
+            train_if_threshold_met(db)
+
+    def _schedule_jobs() -> None:
         refresh_time = settings.refresh_time
         hour, minute = [int(part) for part in refresh_time.split(":", maxsplit=1)]
         scheduler.add_job(
@@ -38,6 +43,16 @@ def create_app(
             hour=hour,
             minute=minute,
             id="daily_pipeline",
+            replace_existing=True,
+        )
+        retrain_time = settings.personalization_retrain_time
+        retrain_hour, retrain_minute = [int(part) for part in retrain_time.split(":", maxsplit=1)]
+        scheduler.add_job(
+            _run_personalization_job_wrapper,
+            trigger="cron",
+            hour=retrain_hour,
+            minute=retrain_minute,
+            id="personalization_retrain",
             replace_existing=True,
         )
         scheduler.start()
@@ -58,8 +73,9 @@ def create_app(
                 )
                 if not existing_run:
                     run_daily_pipeline(db)
+            train_if_threshold_met(db)
         if enable_scheduler:
-            _schedule_daily_job()
+            _schedule_jobs()
         yield
         if enable_scheduler and scheduler.running:
             scheduler.shutdown(wait=False)
