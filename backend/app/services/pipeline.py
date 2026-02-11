@@ -23,6 +23,7 @@ from app.models import (
 )
 from app.providers.auctions import AuctionProvider, build_auction_provider
 from app.providers.enrichment import ParcelEnrichmentProvider, build_enrichment_provider
+from app.providers.listing_types import ListingFetchResult, ListingScanConfig
 from app.providers.listings import ListingProvider, build_listing_provider
 from app.providers.metrics import MarketMetricsProvider, build_market_metrics_provider
 from app.providers.mock_data import CandidateRecord, CountyMetric, mock_candidates, mock_market_metrics
@@ -41,6 +42,7 @@ def run_daily_pipeline(
 ) -> SyncRun:
     settings = read_settings(db)
     runtime = get_settings()
+    price_cap = runtime.listing_price_max
     run = SyncRun(run_type="daily", status="running")
     db.add(run)
     db.commit()
@@ -83,10 +85,10 @@ def run_daily_pipeline(
             live_enrichment_provider = enrichment_provider or build_enrichment_provider(runtime)
             live_metrics_provider = metrics_provider or build_market_metrics_provider(runtime)
 
-            listing_candidates, listings_error = _fetch_live_listings(
+            listing_scan = _build_listing_scan_config(runtime, state=settings.state)
+            listing_candidates, listings_error, listings_warning = _fetch_live_listings(
                 live_listing_provider,
-                state=settings.state,
-                max_price=6000.0,
+                scan=listing_scan,
             )
             if listings_error:
                 degraded = True
@@ -101,7 +103,7 @@ def run_daily_pipeline(
                 listing_candidates = [
                     candidate
                     for candidate in mock_candidates(settings.state)
-                    if candidate.source_type == "listing" and candidate.price <= 6000
+                    if candidate.source_type == "listing" and candidate.price <= price_cap
                 ]
                 _record_provider_event(
                     db,
@@ -111,12 +113,22 @@ def run_daily_pipeline(
                     error_summary="RapidAPI unavailable, used mock listing fallback.",
                 )
             else:
-                _record_provider_event(
-                    db,
-                    run.id,
-                    provider=live_listing_provider.provider_name,
-                    status="success",
-                )
+                if listings_warning:
+                    degraded = True
+                    _record_provider_event(
+                        db,
+                        run.id,
+                        provider=live_listing_provider.provider_name,
+                        status="degraded",
+                        error_summary=listings_warning,
+                    )
+                else:
+                    _record_provider_event(
+                        db,
+                        run.id,
+                        provider=live_listing_provider.provider_name,
+                        status="success",
+                    )
 
             listing_candidates, enrichment_error = _enrich_listings(live_enrichment_provider, listing_candidates)
             if enrichment_error:
@@ -139,7 +151,7 @@ def run_daily_pipeline(
             auction_candidates, auctions_error, auctions_warning = _fetch_live_auctions(
                 live_auction_provider,
                 state=settings.state,
-                max_price=6000.0,
+                max_price=price_cap,
             )
             if auctions_error:
                 degraded = True
@@ -232,7 +244,8 @@ def run_daily_pipeline(
 
         counties_using_fallback_metric: set[str] = set()
         for candidate in candidates:
-            if candidate.price > 6000:
+            if candidate.price > price_cap:
+                # Guardrail: enforce configured max listing price even if a provider sends out-of-policy data.
                 continue
             scored_count += 1
             parcel = _upsert_parcel(db, candidate)
@@ -371,14 +384,35 @@ def latest_successful_run_id(db: Session) -> str | None:
 def _fetch_live_listings(
     provider: ListingProvider,
     *,
-    state: str,
-    max_price: float,
-) -> tuple[list[CandidateRecord], str | None]:
+    scan: ListingScanConfig,
+) -> tuple[list[CandidateRecord], str | None, str | None]:
     try:
-        listings = provider.fetch(state=state, max_price=max_price)
-        return listings, None
+        result: ListingFetchResult = provider.fetch(scan=scan)
+        warning: str | None = None
+        if result.warnings:
+            warning = (
+                f"listing_requests={result.successful_requests}/{result.attempted_requests}; "
+                f"first_warning={result.warnings[0]}"
+            )
+        return result.candidates, None, warning
     except Exception as exc:  # noqa: BLE001
-        return [], str(exc)
+        return [], str(exc), None
+
+
+def _build_listing_scan_config(runtime, *, state: str) -> ListingScanConfig:
+    locations = runtime.listing_location_list
+    if not locations:
+        locations = [state]
+    offset_step = runtime.listing_offset_step or runtime.listing_page_limit
+    return ListingScanConfig(
+        state=state,
+        locations=locations,
+        page_limit=runtime.listing_page_limit,
+        pages_per_location=runtime.listing_pages_per_location,
+        sort=runtime.listing_sort,
+        price_max=runtime.listing_price_max,
+        offset_step=offset_step,
+    )
 
 
 def _fetch_live_auctions(

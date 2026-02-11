@@ -87,6 +87,19 @@ Supported canonical columns:
 
 Common aliases are accepted (`id`, `apn`, `winning_bid`, `acres`, `lat`, `lon`, etc.). Invalid rows are skipped and surfaced as degraded provider events.
 
+## Live Listings Mode (RapidAPI `for-sale`)
+For listings-first live scans, set:
+- `LANDORAMA_MOCK_MODE=false`
+- `LANDORAMA_RAPIDAPI_HOST=us-real-estate-listings.p.rapidapi.com`
+- `LANDORAMA_RAPIDAPI_PROVIDER_SLUG=for-sale`
+- `LANDORAMA_LISTING_LOCATIONS=Metairie, LA,22345`
+- `LANDORAMA_LISTING_PAGE_LIMIT=50`
+- `LANDORAMA_LISTING_PAGES_PER_LOCATION=2`
+- `LANDORAMA_LISTING_SORT=relevance`
+- `LANDORAMA_LISTING_PRICE_MAX=6000`
+
+The provider scans each location page-by-page (`offset` increments per page), forces `property_type=land`, and marks runs as `degraded` when some listing requests fail but usable candidates still exist.
+
 ## Database Migrations
 From `/Users/bborn/land-o-rama`:
 - `make db-upgrade`

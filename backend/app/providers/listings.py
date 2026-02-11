@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from app.core.config import Settings
+from app.providers.listing_types import ListingFetchResult, ListingScanConfig
 from app.providers.mock_data import CandidateRecord, mock_candidates
 from app.providers.rapidapi_listings import RapidAPIListingProvider
 
@@ -11,7 +12,7 @@ from app.providers.rapidapi_listings import RapidAPIListingProvider
 class ListingProvider(Protocol):
     provider_name: str
 
-    def fetch(self, state: str, max_price: float) -> list[CandidateRecord]:
+    def fetch(self, scan: ListingScanConfig) -> ListingFetchResult:
         """Fetch listing candidates from an upstream source."""
 
 
@@ -19,12 +20,18 @@ class ListingProvider(Protocol):
 class MockListingProvider:
     provider_name: str = "mock_listings"
 
-    def fetch(self, state: str, max_price: float) -> list[CandidateRecord]:
-        return [
+    def fetch(self, scan: ListingScanConfig) -> ListingFetchResult:
+        candidates = [
             candidate
-            for candidate in mock_candidates(state=state)
-            if candidate.source_type == "listing" and candidate.price <= max_price
+            for candidate in mock_candidates(state=scan.state)
+            if candidate.source_type == "listing" and candidate.price <= scan.price_max
         ]
+        return ListingFetchResult(
+            candidates=candidates,
+            warnings=[],
+            attempted_requests=max(1, len(scan.locations) * max(1, scan.pages_per_location)),
+            successful_requests=max(1, len(scan.locations) * max(1, scan.pages_per_location)),
+        )
 
 
 def build_listing_provider(settings: Settings) -> ListingProvider:

@@ -19,8 +19,14 @@ class Settings(BaseSettings):
     mock_mode: bool = True
     rapidapi_key: str | None = None
     rapidapi_host: str | None = None
-    rapidapi_provider_slug: str = "land-listings"
+    rapidapi_provider_slug: str = "for-sale"
     rapidapi_metrics_slug: str = "county-market-metrics"
+    listing_locations: str = ""
+    listing_page_limit: int = 50
+    listing_pages_per_location: int = 2
+    listing_sort: str = "relevance"
+    listing_price_max: float = 6000.0
+    listing_offset_step: int = 50
     auction_source_mode: str = "mock"
     auction_csv_dir: str = "/Users/bborn/land-o-rama/data/auction_feeds"
     auction_csv_glob: str = "*.csv"
@@ -38,6 +44,26 @@ class Settings(BaseSettings):
     def _normalize_state(cls, value: str) -> str:
         return value.strip().upper()
 
+    @field_validator("rapidapi_provider_slug")
+    @classmethod
+    def _normalize_provider_slug(cls, value: str) -> str:
+        return value.strip().strip("/")
+
+    @field_validator("listing_page_limit")
+    @classmethod
+    def _validate_listing_page_limit(cls, value: int) -> int:
+        return min(200, max(1, value))
+
+    @field_validator("listing_pages_per_location")
+    @classmethod
+    def _validate_listing_pages_per_location(cls, value: int) -> int:
+        return min(10, max(1, value))
+
+    @field_validator("listing_offset_step")
+    @classmethod
+    def _validate_listing_offset_step(cls, value: int) -> int:
+        return max(1, value)
+
     @property
     def sqlite_url(self) -> str:
         db_file = Path(self.db_path)
@@ -47,6 +73,10 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+    @property
+    def listing_location_list(self) -> list[str]:
+        return [location.strip() for location in self.listing_locations.split(",") if location.strip()]
 
 
 @lru_cache(maxsize=1)

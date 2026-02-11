@@ -9,7 +9,7 @@ Land-O-Rama is a local-first web application with:
 
 ## High-Level Components
 - `Provider Adapters`
-  - Listings adapter (RapidAPI in live mode, fixtures in mock mode).
+  - Listings adapter (RapidAPI `for-sale` location scans in live mode, fixtures in mock mode).
   - Auctions adapter (CSV ingestion in live mode, mock fallback in mock mode).
   - Parcel enrichment adapter (Regrid in live mode, noop in mock mode).
   - Trend metrics adapter (RapidAPI in live mode, mock fallback in mock mode).
@@ -49,6 +49,7 @@ Land-O-Rama is a local-first web application with:
 
 ## Reliability Strategy
 - Per-provider timeouts and retries with backoff.
+- Listings live scans are paginated by location; partial page failures produce warnings and degraded runs.
 - Partial-failure tolerance: mark run degraded but continue pipeline if possible.
 - Explicit run status table with timestamps, counts, and error summaries.
 - Idempotent daily run keyed by run date/source snapshot.

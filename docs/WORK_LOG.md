@@ -218,6 +218,40 @@
   - `/Users/bborn/land-o-rama/backend/app/providers/metrics.py`
   - `/Users/bborn/land-o-rama/backend/app/providers/rapidapi_metrics.py`
   - `/Users/bborn/land-o-rama/backend/app/schemas/api.py`
+
+## 2026-02-11 - Listings-First RapidAPI `for-sale` Integration
+- Task summary:
+  - Switched live listings adapter to RapidAPI `for-sale` location-based scans with pagination, land-only filtering, and configurable price cap/sort.
+  - Added typed listing scan/fetch contracts and pipeline wiring for partial listing failures (`degraded`) with explicit warning propagation.
+  - Added parser hardening for alternate payload shapes, lot-size conversion, and cross-page/location dedupe.
+  - Expanded runtime/settings contracts and runs UI metadata to surface listing scan configuration.
+  - Added provider tests for request params, retry semantics, partial failures, and dedupe behavior.
+- Files changed:
+  - `/Users/bborn/land-o-rama/backend/app/core/config.py`
+  - `/Users/bborn/land-o-rama/backend/.env.example`
+  - `/Users/bborn/land-o-rama/backend/app/providers/listing_types.py`
+  - `/Users/bborn/land-o-rama/backend/app/providers/listings.py`
+  - `/Users/bborn/land-o-rama/backend/app/providers/rapidapi_listings.py`
+  - `/Users/bborn/land-o-rama/backend/app/providers/__init__.py`
+  - `/Users/bborn/land-o-rama/backend/app/services/pipeline.py`
+  - `/Users/bborn/land-o-rama/backend/app/services/settings.py`
+  - `/Users/bborn/land-o-rama/backend/app/schemas/api.py`
+  - `/Users/bborn/land-o-rama/backend/tests/test_provider_pipeline.py`
+  - `/Users/bborn/land-o-rama/frontend/src/types.ts`
+  - `/Users/bborn/land-o-rama/frontend/src/App.tsx`
+  - `/Users/bborn/land-o-rama/frontend/src/App.test.tsx`
+  - `/Users/bborn/land-o-rama/README.md`
+  - `/Users/bborn/land-o-rama/docs/API_SPEC.md`
+  - `/Users/bborn/land-o-rama/docs/ARCHITECTURE.md`
+  - `/Users/bborn/land-o-rama/docs/WORK_LOG.md`
+- Validation performed:
+  - `cd /Users/bborn/land-o-rama/backend && . .venv/bin/activate && pytest -q` passed (`34 passed`).
+  - `cd /Users/bborn/land-o-rama/frontend && npm run test -- --run` passed (`14 passed`).
+  - `cd /Users/bborn/land-o-rama/frontend && npm run build` passed.
+- Next recommended tasks:
+  - Add a targeted integration test that verifies `/api/v1/settings` listing scan fields end-to-end.
+  - Add zipcode/city normalization helpers for `LANDORAMA_LISTING_LOCATIONS` to reduce malformed location input.
+  - Add optional per-run persisted listing request diagnostics (location/page success/failure counts) for deeper operator debugging.
   - `/Users/bborn/land-o-rama/backend/app/services/pipeline.py`
   - `/Users/bborn/land-o-rama/backend/app/services/settings.py`
   - `/Users/bborn/land-o-rama/backend/tests/test_provider_pipeline.py`
@@ -331,3 +365,36 @@
   - Add backend API integration coverage for historical opportunities with `null` source destination fields after migration.
   - Add a compact in-row listing-source indicator in the dashboard table to preview destination availability before opening detail.
   - Add operator-facing data quality metrics for source URL capture rates by provider.
+
+## 2026-02-11 - Listings-First RapidAPI `for-sale` Integration (Execution)
+- Task summary:
+  - Implemented `for-sale` live listing scans with location pagination, land-only query enforcement, retry handling, and deterministic dedupe.
+  - Added typed listing scan/result contracts and pipeline degraded-run behavior for partial listing request failures.
+  - Expanded runtime settings/API payloads and runs UI metadata for listing scan visibility.
+  - Added/updated provider and UI tests for params, retries, warnings, dedupe, and settings rendering.
+- Files changed:
+  - `/Users/bborn/land-o-rama/backend/app/core/config.py`
+  - `/Users/bborn/land-o-rama/backend/.env.example`
+  - `/Users/bborn/land-o-rama/backend/app/providers/listing_types.py`
+  - `/Users/bborn/land-o-rama/backend/app/providers/listings.py`
+  - `/Users/bborn/land-o-rama/backend/app/providers/rapidapi_listings.py`
+  - `/Users/bborn/land-o-rama/backend/app/providers/__init__.py`
+  - `/Users/bborn/land-o-rama/backend/app/services/pipeline.py`
+  - `/Users/bborn/land-o-rama/backend/app/services/settings.py`
+  - `/Users/bborn/land-o-rama/backend/app/schemas/api.py`
+  - `/Users/bborn/land-o-rama/backend/tests/test_provider_pipeline.py`
+  - `/Users/bborn/land-o-rama/frontend/src/types.ts`
+  - `/Users/bborn/land-o-rama/frontend/src/App.tsx`
+  - `/Users/bborn/land-o-rama/frontend/src/App.test.tsx`
+  - `/Users/bborn/land-o-rama/README.md`
+  - `/Users/bborn/land-o-rama/docs/API_SPEC.md`
+  - `/Users/bborn/land-o-rama/docs/ARCHITECTURE.md`
+  - `/Users/bborn/land-o-rama/docs/WORK_LOG.md`
+- Validation performed:
+  - `cd /Users/bborn/land-o-rama/backend && . .venv/bin/activate && pytest -q` passed (`34 passed`).
+  - `cd /Users/bborn/land-o-rama/frontend && npm run test -- --run` passed (`14 passed`).
+  - `cd /Users/bborn/land-o-rama/frontend && npm run build` passed.
+- Next recommended tasks:
+  - Add integration coverage asserting `GET /api/v1/settings` includes listing scan fields.
+  - Add stricter location normalization for `LANDORAMA_LISTING_LOCATIONS` (city/state tokens and zip-only inputs).
+  - Persist per-run listing request diagnostics (location/page attempt counts) for operational debugging.

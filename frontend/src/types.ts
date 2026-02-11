@@ -88,6 +88,11 @@ export type SettingsResponse = {
   regrid_configured: boolean;
   rapidapi_provider_slug: string;
   rapidapi_metrics_slug: string;
+  listing_locations_count: number;
+  listing_page_limit: number;
+  listing_pages_per_location: number;
+  listing_sort: string;
+  listing_price_max: number;
   auction_source_mode: string;
   auction_csv_dir: string;
   auction_csv_glob: string;

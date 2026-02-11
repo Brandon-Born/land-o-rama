@@ -141,8 +141,13 @@ function defaultHandler(url: URL, init?: RequestInit): { status?: number; body: 
         disclaimers_enabled: true,
         rapidapi_configured: false,
         regrid_configured: false,
-        rapidapi_provider_slug: "land-listings",
+        rapidapi_provider_slug: "for-sale",
         rapidapi_metrics_slug: "county-market-metrics",
+        listing_locations_count: 2,
+        listing_page_limit: 50,
+        listing_pages_per_location: 2,
+        listing_sort: "relevance",
+        listing_price_max: 6000,
         auction_source_mode: "mock",
         auction_csv_dir: "/Users/bborn/land-o-rama/data/auction_feeds",
         auction_csv_glob: "*.csv",
@@ -321,8 +326,13 @@ it("renders provider health configuration and events", async () => {
           disclaimers_enabled: true,
           rapidapi_configured: true,
           regrid_configured: false,
-          rapidapi_provider_slug: "county-land-feed",
+          rapidapi_provider_slug: "for-sale",
           rapidapi_metrics_slug: "county-market-v2",
+          listing_locations_count: 3,
+          listing_page_limit: 50,
+          listing_pages_per_location: 2,
+          listing_sort: "price_low_to_high",
+          listing_price_max: 6000,
           auction_source_mode: "csv",
           auction_csv_dir: "/tmp/auctions",
           auction_csv_glob: "*.csv",
@@ -350,7 +360,8 @@ it("renders provider health configuration and events", async () => {
   await waitFor(() => {
     expect(screen.getByText("RapidAPI: Configured")).toBeInTheDocument();
     expect(screen.getByText("Regrid: Missing Key")).toBeInTheDocument();
-    expect(screen.getByText("Listing Slug: county-land-feed")).toBeInTheDocument();
+    expect(screen.getByText("Listing Slug: for-sale")).toBeInTheDocument();
+    expect(screen.getByText("Listing Locations: 3")).toBeInTheDocument();
     expect(screen.getByText("Metrics Slug: county-market-v2")).toBeInTheDocument();
     expect(screen.getByText("Auction Source: csv")).toBeInTheDocument();
     expect(screen.getByText(/Personalization: Ready/i)).toBeInTheDocument();
