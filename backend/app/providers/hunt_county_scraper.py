@@ -62,7 +62,21 @@ class HuntCountyDownloadFirstScraper:
             attempted_sources += 1
             try:
                 local_path = self._download_to_local(source_url)
-                parsed_rows, accepted, rejected, parsed_candidates = self._parse_csv(local_path, state=state, max_price=max_price)
+                parsed_rows, _accepted_pre_dedupe, rejected, parsed_candidates = self._parse_csv(
+                    local_path,
+                    state=state,
+                    max_price=max_price,
+                )
+                accepted = 0
+                dedupe_rejected = 0
+                for candidate in parsed_candidates:
+                    dedupe_key = (candidate.state, candidate.parcel_key, candidate.external_id)
+                    if dedupe_key in seen_keys:
+                        dedupe_rejected += 1
+                        continue
+                    seen_keys.add(dedupe_key)
+                    candidates.append(candidate)
+                    accepted += 1
                 checksum = _sha256(local_path.read_bytes())
                 artifacts.append(
                     ScrapeArtifact(
@@ -75,15 +89,9 @@ class HuntCountyDownloadFirstScraper:
                         checksum_sha256=checksum,
                         records_found=parsed_rows,
                         records_accepted=accepted,
-                        records_rejected=rejected,
+                        records_rejected=rejected + dedupe_rejected,
                     )
                 )
-                for candidate in parsed_candidates:
-                    dedupe_key = (candidate.state, candidate.parcel_key, candidate.external_id)
-                    if dedupe_key in seen_keys:
-                        continue
-                    seen_keys.add(dedupe_key)
-                    candidates.append(candidate)
                 successful_sources += 1
             except Exception as exc:  # noqa: BLE001
                 warnings.append(f"{source_url}: {exc}")

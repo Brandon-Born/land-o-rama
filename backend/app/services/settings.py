@@ -7,16 +7,20 @@ from app.core.config import get_settings
 from app.models import ConfigKV, Feedback, ModelTrainingRun, ProviderRunEvent, ScrapeArtifact
 from app.schemas.api import ProviderEventStatus, SettingsResponse, SettingsUpdate
 
-DEFAULTS = {
-    "state": get_settings().default_state,
-    "refresh_time": get_settings().refresh_time,
-    "mock_mode": "true" if get_settings().mock_mode else "false",
-    "disclaimers_enabled": "true",
-}
+
+def _defaults() -> dict[str, str]:
+    runtime = get_settings()
+    return {
+        "state": runtime.default_state,
+        "refresh_time": runtime.refresh_time,
+        "mock_mode": "true" if runtime.mock_mode else "false",
+        "disclaimers_enabled": "true",
+    }
 
 
 def ensure_default_settings(db: Session) -> None:
-    for key, value in DEFAULTS.items():
+    defaults = _defaults()
+    for key, value in defaults.items():
         existing = db.get(ConfigKV, key)
         if not existing:
             db.add(ConfigKV(key=key, value=value))
@@ -26,8 +30,9 @@ def ensure_default_settings(db: Session) -> None:
 def read_settings(db: Session) -> SettingsResponse:
     ensure_default_settings(db)
     runtime = get_settings()
+    defaults = _defaults()
     values: dict[str, str] = {}
-    for key in DEFAULTS:
+    for key in defaults:
         record = db.get(ConfigKV, key)
         if record:
             values[key] = record.value
@@ -65,9 +70,9 @@ def read_settings(db: Session) -> SettingsResponse:
         )
     provider_health = _provider_health(db)
     return SettingsResponse(
-        state=values.get("state", DEFAULTS["state"]),
-        refresh_time=values.get("refresh_time", DEFAULTS["refresh_time"]),
-        mock_mode=values.get("mock_mode", DEFAULTS["mock_mode"]) == "true",
+        state=values.get("state", defaults["state"]),
+        refresh_time=values.get("refresh_time", defaults["refresh_time"]),
+        mock_mode=values.get("mock_mode", defaults["mock_mode"]) == "true",
         disclaimers_enabled=values.get("disclaimers_enabled", "true") == "true",
         regrid_configured=bool(runtime.regrid_api_key),
         price_cap=runtime.price_cap,
