@@ -51,7 +51,6 @@ def run_daily_pipeline(
     degraded = False
 
     try:
-        listing_candidates: list[CandidateRecord] = []
         auction_candidates: list[CandidateRecord] = []
         market_metrics: list[CountyMetric] = []
         candidates: list[CandidateRecord] = []
@@ -80,73 +79,14 @@ def run_daily_pipeline(
             _record_provider_event(db, run.id, provider="mock_auctions", status="success")
             _record_provider_event(db, run.id, provider="mock_market_metrics", status="success")
         else:
-            live_listing_provider = listing_provider or build_listing_provider(runtime)
             live_auction_provider = auction_provider or build_auction_provider(runtime)
-            live_enrichment_provider = enrichment_provider or build_enrichment_provider(runtime)
             live_metrics_provider = metrics_provider or build_market_metrics_provider(runtime)
 
-            listing_scan = _build_listing_scan_config(runtime, state=settings.state)
-            listing_candidates, listings_error, listings_warning = _fetch_live_listings(
-                live_listing_provider,
-                scan=listing_scan,
-            )
-            if listings_error:
-                degraded = True
-                _record_provider_event(
-                    db,
-                    run.id,
-                    provider=live_listing_provider.provider_name,
-                    status="failed",
-                    error_summary=listings_error,
-                )
-                # Keep app productive with mock listing fallback when live feed is unavailable.
-                listing_candidates = [
-                    candidate
-                    for candidate in mock_candidates(settings.state)
-                    if candidate.source_type == "listing" and candidate.price <= price_cap
-                ]
-                _record_provider_event(
-                    db,
-                    run.id,
-                    provider="mock_listing_fallback",
-                    status="degraded",
-                    error_summary="RapidAPI unavailable, used mock listing fallback.",
-                )
-            else:
-                if listings_warning:
-                    degraded = True
-                    _record_provider_event(
-                        db,
-                        run.id,
-                        provider=live_listing_provider.provider_name,
-                        status="degraded",
-                        error_summary=listings_warning,
-                    )
-                else:
-                    _record_provider_event(
-                        db,
-                        run.id,
-                        provider=live_listing_provider.provider_name,
-                        status="success",
-                    )
-
-            listing_candidates, enrichment_error = _enrich_listings(live_enrichment_provider, listing_candidates)
-            if enrichment_error:
-                degraded = True
-                _record_provider_event(
-                    db,
-                    run.id,
-                    provider=live_enrichment_provider.provider_name,
-                    status="degraded",
-                    error_summary=enrichment_error,
-                )
-            else:
-                _record_provider_event(
-                    db,
-                    run.id,
-                    provider=live_enrichment_provider.provider_name,
-                    status="success",
-                )
+            # Listing providers are deprecated; keep parameter for backward test compatibility.
+            _ = listing_provider
+            _ = build_listing_provider
+            _ = enrichment_provider
+            _ = build_enrichment_provider
 
             auction_candidates, auctions_error, auctions_warning = _fetch_live_auctions(
                 live_auction_provider,
@@ -179,7 +119,22 @@ def run_daily_pipeline(
                     status="success",
                 )
 
-            candidates = listing_candidates + auction_candidates
+            candidates = auction_candidates
+
+            if not candidates:
+                degraded = True
+                run.status = "degraded"
+                run.error_summary = "No new auction candidates available from scraper/county source."
+                run.finished_at = datetime.now(UTC)
+                _record_provider_event(
+                    db,
+                    run.id,
+                    provider="scraper_no_new_data",
+                    status="degraded",
+                    error_summary="No new county auction records were available for this run.",
+                )
+                db.commit()
+                return run
 
             candidate_counties = sorted({candidate.county for candidate in candidates})
             market_metrics, metrics_error = _fetch_live_market_metrics(
@@ -374,7 +329,7 @@ def purge_old_data(db: Session, months: int = 24) -> None:
 def latest_successful_run_id(db: Session) -> str | None:
     stmt = (
         select(SyncRun.id)
-        .where(SyncRun.status.in_(["success", "degraded"]))
+        .where(SyncRun.status.in_(["success", "degraded"]), SyncRun.candidates_scored > 0)
         .order_by(desc(SyncRun.started_at))
         .limit(1)
     )

@@ -6,7 +6,6 @@ from typing import Protocol
 
 from app.core.config import Settings
 from app.providers.mock_data import CountyMetric, mock_market_metrics
-from app.providers.rapidapi_metrics import RapidAPIMarketMetricsProvider
 
 
 class MarketMetricsProvider(Protocol):
@@ -29,12 +28,6 @@ class MockMarketMetricsProvider:
 
 
 def build_market_metrics_provider(settings: Settings) -> MarketMetricsProvider:
-    if settings.mock_mode:
-        return MockMarketMetricsProvider()
-    return RapidAPIMarketMetricsProvider(
-        api_key=settings.rapidapi_key,
-        host=settings.rapidapi_host,
-        provider_slug=settings.rapidapi_metrics_slug,
-        timeout_seconds=settings.provider_timeout_seconds,
-        max_retries=settings.provider_max_retries,
-    )
+    _ = settings
+    # RapidAPI metrics are deprecated; runtime uses local/mock metrics provider.
+    return MockMarketMetricsProvider()
