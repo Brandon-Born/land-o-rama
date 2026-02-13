@@ -19,6 +19,7 @@ from app.models import (
     Parcel,
     ProviderRunEvent,
     RiskFlag,
+    ScrapeArtifact,
     SyncRun,
 )
 from app.providers.auctions import AuctionProvider, build_auction_provider
@@ -93,6 +94,14 @@ def run_daily_pipeline(
                 state=settings.state,
                 max_price=price_cap,
             )
+            scrape_artifacts = getattr(live_auction_provider, "last_artifacts", [])
+            if scrape_artifacts:
+                _persist_scrape_artifacts(
+                    db,
+                    run_id=run.id,
+                    provider=live_auction_provider.provider_name,
+                    artifacts=scrape_artifacts,
+                )
             if auctions_error:
                 degraded = True
                 _record_provider_event(
@@ -589,6 +598,33 @@ def _persist_risk_flags(
             is_exclusionary=is_excluded and candidate.wetland_risk_level >= 7,
         )
     )
+
+
+def _persist_scrape_artifacts(
+    db: Session,
+    *,
+    run_id: str,
+    provider: str,
+    artifacts: list,
+) -> None:
+    for artifact in artifacts:
+        db.add(
+            ScrapeArtifact(
+                run_id=run_id,
+                provider=provider,
+                county=artifact.county,
+                state=artifact.state,
+                source_url=artifact.source_url,
+                local_path=artifact.local_path,
+                fetched_at=artifact.fetched_at,
+                parser_version=artifact.parser_version,
+                checksum_sha256=artifact.checksum_sha256,
+                records_found=artifact.records_found,
+                records_accepted=artifact.records_accepted,
+                records_rejected=artifact.records_rejected,
+            )
+        )
+    db.flush()
 
 
 def _compute_price_per_acre_benchmarks(candidates: list[CandidateRecord]) -> dict[str, float]:

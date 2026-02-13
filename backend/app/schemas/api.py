@@ -130,6 +130,13 @@ class SettingsResponse(BaseModel):
     provider_timeout_seconds: float = 12.0
     provider_max_retries: int = 2
     market_metrics_cache_lookback_days: int = 30
+    scraper_primary_source: str = "county_auction_scraper"
+    scraper_mode: str = "download_first"
+    scraper_target_counties: list[str] = Field(default_factory=list)
+    scraper_last_success_at: datetime | None = None
+    scraper_last_success_county: str | None = None
+    scraper_parse_error_count: int = 0
+    scraper_last_records_accepted: int = 0
     personalization_ready: bool = False
     feedback_labels_count: int = 0
     personalization_threshold: int = 50

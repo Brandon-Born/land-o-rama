@@ -4,7 +4,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.models import ConfigKV, Feedback, ModelTrainingRun, ProviderRunEvent
+from app.models import ConfigKV, Feedback, ModelTrainingRun, ProviderRunEvent, ScrapeArtifact
 from app.schemas.api import ProviderEventStatus, SettingsResponse, SettingsUpdate
 
 DEFAULTS = {
@@ -37,6 +37,32 @@ def read_settings(db: Session) -> SettingsResponse:
     latest_training = db.scalar(
         select(ModelTrainingRun).where(ModelTrainingRun.status == "success").order_by(ModelTrainingRun.trained_at.desc()).limit(1)
     )
+    latest_scrape_artifact = db.scalar(select(ScrapeArtifact).order_by(ScrapeArtifact.created_at.desc()).limit(1))
+    latest_success_scrape = db.scalar(
+        select(ScrapeArtifact)
+        .where(ScrapeArtifact.records_accepted > 0)
+        .order_by(ScrapeArtifact.fetched_at.desc())
+        .limit(1)
+    )
+    scraper_parse_error_count = 0
+    scraper_last_records_accepted = 0
+    if latest_scrape_artifact is not None:
+        scraper_parse_error_count = (
+            db.scalar(
+                select(func.coalesce(func.sum(ScrapeArtifact.records_rejected), 0)).where(
+                    ScrapeArtifact.run_id == latest_scrape_artifact.run_id
+                )
+            )
+            or 0
+        )
+        scraper_last_records_accepted = (
+            db.scalar(
+                select(func.coalesce(func.sum(ScrapeArtifact.records_accepted), 0)).where(
+                    ScrapeArtifact.run_id == latest_scrape_artifact.run_id
+                )
+            )
+            or 0
+        )
     provider_health = _provider_health(db)
     return SettingsResponse(
         state=values.get("state", DEFAULTS["state"]),
@@ -59,6 +85,13 @@ def read_settings(db: Session) -> SettingsResponse:
         provider_timeout_seconds=runtime.provider_timeout_seconds,
         provider_max_retries=runtime.provider_max_retries,
         market_metrics_cache_lookback_days=runtime.market_metrics_cache_lookback_days,
+        scraper_primary_source="county_auction_scraper",
+        scraper_mode=runtime.scraper_mode,
+        scraper_target_counties=runtime.scraper_target_county_list,
+        scraper_last_success_at=latest_success_scrape.fetched_at if latest_success_scrape else None,
+        scraper_last_success_county=latest_success_scrape.county if latest_success_scrape else None,
+        scraper_parse_error_count=int(scraper_parse_error_count),
+        scraper_last_records_accepted=int(scraper_last_records_accepted),
         personalization_ready=bool(latest_training and label_count >= runtime.personalization_threshold),
         feedback_labels_count=label_count,
         personalization_threshold=runtime.personalization_threshold,

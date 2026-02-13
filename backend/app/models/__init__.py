@@ -12,6 +12,7 @@ from app.models.entities import (
     Parcel,
     ProviderRunEvent,
     RiskFlag,
+    ScrapeArtifact,
     SyncRun,
 )
 
@@ -29,5 +30,6 @@ __all__ = [
     "Parcel",
     "ProviderRunEvent",
     "RiskFlag",
+    "ScrapeArtifact",
     "SyncRun",
 ]

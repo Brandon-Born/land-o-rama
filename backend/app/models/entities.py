@@ -106,6 +106,7 @@ class SyncRun(Base):
 
     opportunities: Mapped[list["Opportunity"]] = relationship(back_populates="run")
     provider_events: Mapped[list["ProviderRunEvent"]] = relationship(back_populates="run")
+    scrape_artifacts: Mapped[list["ScrapeArtifact"]] = relationship(back_populates="run")
 
 
 class Opportunity(Base):
@@ -187,6 +188,27 @@ class ProviderRunEvent(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
 
     run: Mapped[SyncRun] = relationship(back_populates="provider_events")
+
+
+class ScrapeArtifact(Base):
+    __tablename__ = "scrape_artifacts"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    run_id: Mapped[str] = mapped_column(ForeignKey("sync_runs.id"), index=True)
+    provider: Mapped[str] = mapped_column(String(64), index=True)
+    county: Mapped[str] = mapped_column(String(128), index=True)
+    state: Mapped[str] = mapped_column(String(2), index=True)
+    source_url: Mapped[str] = mapped_column(String(1024))
+    local_path: Mapped[str] = mapped_column(String(1024))
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    parser_version: Mapped[str] = mapped_column(String(64))
+    checksum_sha256: Mapped[str] = mapped_column(String(64))
+    records_found: Mapped[int] = mapped_column(Integer, default=0)
+    records_accepted: Mapped[int] = mapped_column(Integer, default=0)
+    records_rejected: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+    run: Mapped[SyncRun] = relationship(back_populates="scrape_artifacts")
 
 
 class ModelTrainingRun(Base):
