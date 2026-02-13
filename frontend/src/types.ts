@@ -84,15 +84,8 @@ export type SettingsResponse = {
   refresh_time: string;
   mock_mode: boolean;
   disclaimers_enabled: boolean;
-  rapidapi_configured: boolean;
   regrid_configured: boolean;
-  rapidapi_provider_slug: string;
-  rapidapi_metrics_slug: string;
-  listing_locations_count: number;
-  listing_page_limit: number;
-  listing_pages_per_location: number;
-  listing_sort: string;
-  listing_price_max: number;
+  price_cap: number;
   auction_source_mode: string;
   auction_csv_dir: string;
   auction_csv_glob: string;

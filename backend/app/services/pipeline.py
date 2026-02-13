@@ -23,9 +23,7 @@ from app.models import (
     SyncRun,
 )
 from app.providers.auctions import AuctionProvider, build_auction_provider
-from app.providers.enrichment import ParcelEnrichmentProvider, build_enrichment_provider
-from app.providers.listing_types import ListingFetchResult, ListingScanConfig
-from app.providers.listings import ListingProvider, build_listing_provider
+from app.providers.enrichment import ParcelEnrichmentProvider
 from app.providers.metrics import MarketMetricsProvider, build_market_metrics_provider
 from app.providers.mock_data import CandidateRecord, CountyMetric, mock_candidates, mock_market_metrics
 from app.scoring.engine import score_candidate
@@ -36,14 +34,13 @@ from app.services.settings import read_settings
 def run_daily_pipeline(
     db: Session,
     *,
-    listing_provider: ListingProvider | None = None,
     auction_provider: AuctionProvider | None = None,
-    enrichment_provider: ParcelEnrichmentProvider | None = None,
+    enrichment_provider: ParcelEnrichmentProvider | None = None,  # kept for call-site compatibility
     metrics_provider: MarketMetricsProvider | None = None,
 ) -> SyncRun:
     settings = read_settings(db)
     runtime = get_settings()
-    price_cap = runtime.listing_price_max
+    price_cap = runtime.price_cap
     run = SyncRun(run_type="daily", status="running")
     db.add(run)
     db.commit()
@@ -83,11 +80,7 @@ def run_daily_pipeline(
             live_auction_provider = auction_provider or build_auction_provider(runtime)
             live_metrics_provider = metrics_provider or build_market_metrics_provider(runtime)
 
-            # Listing providers are deprecated; keep parameter for backward test compatibility.
-            _ = listing_provider
-            _ = build_listing_provider
             _ = enrichment_provider
-            _ = build_enrichment_provider
 
             auction_candidates, auctions_error, auctions_warning = _fetch_live_auctions(
                 live_auction_provider,
@@ -345,40 +338,6 @@ def latest_successful_run_id(db: Session) -> str | None:
     return db.scalar(stmt)
 
 
-def _fetch_live_listings(
-    provider: ListingProvider,
-    *,
-    scan: ListingScanConfig,
-) -> tuple[list[CandidateRecord], str | None, str | None]:
-    try:
-        result: ListingFetchResult = provider.fetch(scan=scan)
-        warning: str | None = None
-        if result.warnings:
-            warning = (
-                f"listing_requests={result.successful_requests}/{result.attempted_requests}; "
-                f"first_warning={result.warnings[0]}"
-            )
-        return result.candidates, None, warning
-    except Exception as exc:  # noqa: BLE001
-        return [], str(exc), None
-
-
-def _build_listing_scan_config(runtime, *, state: str) -> ListingScanConfig:
-    locations = runtime.listing_location_list
-    if not locations:
-        locations = [state]
-    offset_step = runtime.listing_offset_step or runtime.listing_page_limit
-    return ListingScanConfig(
-        state=state,
-        locations=locations,
-        page_limit=runtime.listing_page_limit,
-        pages_per_location=runtime.listing_pages_per_location,
-        sort=runtime.listing_sort,
-        price_max=runtime.listing_price_max,
-        offset_step=offset_step,
-    )
-
-
 def _fetch_live_auctions(
     provider: AuctionProvider,
     *,
@@ -411,26 +370,6 @@ def _fetch_live_market_metrics(
         return metrics, None
     except Exception as exc:  # noqa: BLE001
         return [], str(exc)
-
-
-def _enrich_listings(
-    provider: ParcelEnrichmentProvider,
-    listings: list[CandidateRecord],
-) -> tuple[list[CandidateRecord], str | None]:
-    if not listings:
-        return [], None
-
-    enriched: list[CandidateRecord] = []
-    first_error: str | None = None
-    for listing in listings:
-        try:
-            enriched.append(provider.enrich(listing))
-        except Exception as exc:  # noqa: BLE001
-            # Keep listing and continue so one enrichment failure does not block the run.
-            enriched.append(listing)
-            if first_error is None:
-                first_error = str(exc)
-    return enriched, first_error
 
 
 def _load_cached_market_metrics(

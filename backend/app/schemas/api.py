@@ -114,15 +114,8 @@ class SettingsResponse(BaseModel):
     refresh_time: str
     mock_mode: bool
     disclaimers_enabled: bool = Field(default=True)
-    rapidapi_configured: bool = False
     regrid_configured: bool = False
-    rapidapi_provider_slug: str = "for-sale"
-    rapidapi_metrics_slug: str = "county-market-metrics"
-    listing_locations_count: int = 0
-    listing_page_limit: int = 50
-    listing_pages_per_location: int = 2
-    listing_sort: str = "relevance"
-    listing_price_max: float = 6000.0
+    price_cap: float = 6000.0
     auction_source_mode: str = "mock"
     auction_csv_dir: str = "/Users/bborn/land-o-rama/data/auction_feeds"
     auction_csv_glob: str = "*.csv"

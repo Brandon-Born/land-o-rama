@@ -42,7 +42,7 @@ def test_runs_endpoint_orders_provider_events_desc_for_degraded_run(client, sess
         base = datetime.now(UTC)
         session.add_all(
             [
-                ProviderRunEvent(run_id=run.id, provider="rapidapi_listings", status="failed", created_at=base),
+                ProviderRunEvent(run_id=run.id, provider="county_auction_scraper", status="failed", created_at=base),
                 ProviderRunEvent(
                     run_id=run.id,
                     provider="csv_auctions",
@@ -66,4 +66,4 @@ def test_runs_endpoint_orders_provider_events_desc_for_degraded_run(client, sess
     assert matching["status"] == "degraded"
     assert matching["provider_events"][0]["provider"] == "market_metrics_cache"
     assert matching["provider_events"][1]["provider"] == "csv_auctions"
-    assert matching["provider_events"][2]["provider"] == "rapidapi_listings"
+    assert matching["provider_events"][2]["provider"] == "county_auction_scraper"

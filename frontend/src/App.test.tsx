@@ -126,7 +126,7 @@ function defaultHandler(url: URL, init?: RequestInit): { status?: number; body: 
             candidates_scored: 14,
             excluded_count: 2,
             error_summary: null,
-            provider_events: [{ provider: "rapidapi_listings", status: "success", error_summary: null, created_at: "2026-02-10T00:01:00Z" }],
+            provider_events: [{ provider: "county_auction_scraper", status: "success", error_summary: null, created_at: "2026-02-10T00:01:00Z" }],
           },
         ],
       },
@@ -139,15 +139,8 @@ function defaultHandler(url: URL, init?: RequestInit): { status?: number; body: 
         refresh_time: "08:00",
         mock_mode: true,
         disclaimers_enabled: true,
-        rapidapi_configured: false,
         regrid_configured: false,
-        rapidapi_provider_slug: "for-sale",
-        rapidapi_metrics_slug: "county-market-metrics",
-        listing_locations_count: 2,
-        listing_page_limit: 50,
-        listing_pages_per_location: 2,
-        listing_sort: "relevance",
-        listing_price_max: 6000,
+        price_cap: 6000,
         auction_source_mode: "mock",
         auction_csv_dir: "/Users/bborn/land-o-rama/data/auction_feeds",
         auction_csv_glob: "*.csv",
@@ -166,7 +159,7 @@ function defaultHandler(url: URL, init?: RequestInit): { status?: number; body: 
         feedback_labels_count: 0,
         personalization_threshold: 50,
         personalization_blend_weight: 0.15,
-        provider_health: [{ provider: "rapidapi_listings", status: "success", error_summary: null, created_at: "2026-02-10T00:01:00Z" }],
+        provider_health: [{ provider: "county_auction_scraper", status: "success", error_summary: null, created_at: "2026-02-10T00:01:00Z" }],
       },
     };
   }
@@ -331,15 +324,8 @@ it("renders provider health configuration and events", async () => {
           refresh_time: "08:00",
           mock_mode: false,
           disclaimers_enabled: true,
-          rapidapi_configured: true,
           regrid_configured: false,
-          rapidapi_provider_slug: "for-sale",
-          rapidapi_metrics_slug: "county-market-v2",
-          listing_locations_count: 3,
-          listing_page_limit: 50,
-          listing_pages_per_location: 2,
-          listing_sort: "price_low_to_high",
-          listing_price_max: 6000,
+          price_cap: 6000,
           auction_source_mode: "csv",
           auction_csv_dir: "/tmp/auctions",
           auction_csv_glob: "*.csv",
@@ -359,7 +345,7 @@ it("renders provider health configuration and events", async () => {
           personalization_threshold: 50,
           personalization_blend_weight: 0.15,
           provider_health: [
-            { provider: "rapidapi_listings", status: "degraded", error_summary: "provider timeout", created_at: "2026-02-10T00:01:00Z" },
+            { provider: "county_auction_scraper", status: "degraded", error_summary: "provider timeout", created_at: "2026-02-10T00:01:00Z" },
             { provider: "regrid_enrichment", status: "failed", error_summary: "missing api key", created_at: "2026-02-10T00:01:30Z" },
           ],
         },
@@ -428,8 +414,8 @@ it("renders runs tab with degraded run provider summary", async () => {
               excluded_count: 1,
               error_summary: "listing source degraded",
               provider_events: [
-                { provider: "rapidapi_listings", status: "failed", error_summary: "timeout", created_at: "2026-02-10T00:10:30Z" },
-                { provider: "mock_listing_fallback", status: "degraded", error_summary: null, created_at: "2026-02-10T00:10:31Z" },
+                { provider: "county_auction_scraper", status: "failed", error_summary: "timeout", created_at: "2026-02-10T00:10:30Z" },
+                { provider: "scraper_no_new_data", status: "degraded", error_summary: null, created_at: "2026-02-10T00:10:31Z" },
               ],
             },
           ],
@@ -444,7 +430,7 @@ it("renders runs tab with degraded run provider summary", async () => {
   await user.click(screen.getByRole("button", { name: "Runs" }));
 
   expect(await screen.findByText(/^DEGRADED\s·/i)).toBeInTheDocument();
-  expect(screen.getByText(/Providers: rapidapi_listings:failed \| mock_listing_fallback:degraded/)).toBeInTheDocument();
+  expect(screen.getByText(/Providers: county_auction_scraper:failed \| scraper_no_new_data:degraded/)).toBeInTheDocument();
 });
 
 it("blocks apply when min score is out of range and allows after fix", async () => {
