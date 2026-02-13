@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Protocol
 
 from app.core.config import Settings
+from app.providers.county_registry import build_county_registry
 from app.providers.county_scrapers import CountyScrapeResult, ScrapeArtifact
 from app.providers.hunt_county_scraper import HuntCountyDownloadFirstScraper
 from app.providers.mock_data import CandidateRecord, mock_candidates
@@ -204,6 +205,16 @@ class ScraperAuctionProvider:
     last_artifacts: list[ScrapeArtifact] = field(default_factory=list)
 
     def fetch(self, state: str, max_price: float) -> list[CandidateRecord]:
+        hunt_enabled = any("hunt" in county.lower() for county in self.counties)
+        if not hunt_enabled:
+            self.last_artifacts = []
+            self.last_stats = AuctionFetchStats(
+                scanned_rows=0,
+                accepted_rows=0,
+                rejected_rows=0,
+                error_samples=["No enabled Hunt County scraper target was found in county registry."],
+            )
+            return []
         result: CountyScrapeResult = self.scraper.fetch(
             state=state or self.state,
             counties=self.counties,
@@ -227,9 +238,11 @@ def build_auction_provider(settings: Settings) -> AuctionProvider:
     if settings.mock_mode or source_mode == "mock":
         return MockAuctionProvider()
     if source_mode == "scraper":
+        registry = build_county_registry(settings)
+        enabled_counties = [entry.label for entry in registry if entry.enabled]
         return ScraperAuctionProvider(
             state=settings.default_state,
-            counties=settings.scraper_target_county_list,
+            counties=enabled_counties,
             scraper=HuntCountyDownloadFirstScraper(
                 source_urls=settings.scraper_hunt_source_url_list,
                 download_dir=Path(settings.scraper_download_dir),

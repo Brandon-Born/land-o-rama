@@ -422,3 +422,44 @@
   - Implement Phase 6 Hunt County scraper vertical slice (`CountyAuctionScraperProvider` + Hunt parser + pipeline wiring).
   - Add scraper diagnostics fields to `/api/v1/settings` and runs provider events.
   - Begin Phase 8 removal by gating and then deleting RapidAPI pipeline paths after Hunt parity tests pass.
+
+## 2026-02-13 - Scraper-First Execution Sprint (Phases 6-9)
+- Task summary:
+  - Executed auction-scraper-first runtime cutover and removed RapidAPI/listing runtime integrations.
+  - Added Hunt County download-first scraper adapter with source artifact provenance capture.
+  - Added scraper diagnostics to settings API payload and frontend runs/settings UI.
+  - Added county registry scaffold for post-Hunt expansion with enabled-county wiring.
+  - Added Alembic migration for persisted `scrape_artifacts` provenance records.
+- Files changed:
+  - `/Users/bborn/projects/land-o-rama/backend/app/core/config.py`
+  - `/Users/bborn/projects/land-o-rama/backend/.env.example`
+  - `/Users/bborn/projects/land-o-rama/backend/app/providers/auctions.py`
+  - `/Users/bborn/projects/land-o-rama/backend/app/providers/county_scrapers.py`
+  - `/Users/bborn/projects/land-o-rama/backend/app/providers/hunt_county_scraper.py`
+  - `/Users/bborn/projects/land-o-rama/backend/app/providers/county_registry.py`
+  - `/Users/bborn/projects/land-o-rama/backend/app/providers/__init__.py`
+  - `/Users/bborn/projects/land-o-rama/backend/app/services/pipeline.py`
+  - `/Users/bborn/projects/land-o-rama/backend/app/services/settings.py`
+  - `/Users/bborn/projects/land-o-rama/backend/app/schemas/api.py`
+  - `/Users/bborn/projects/land-o-rama/backend/app/models/entities.py`
+  - `/Users/bborn/projects/land-o-rama/backend/app/models/__init__.py`
+  - `/Users/bborn/projects/land-o-rama/backend/alembic/versions/0004_scrape_artifacts.py`
+  - `/Users/bborn/projects/land-o-rama/backend/tests/test_provider_pipeline.py`
+  - `/Users/bborn/projects/land-o-rama/backend/tests/test_api_runs.py`
+  - `/Users/bborn/projects/land-o-rama/frontend/src/App.tsx`
+  - `/Users/bborn/projects/land-o-rama/frontend/src/types.ts`
+  - `/Users/bborn/projects/land-o-rama/frontend/src/App.test.tsx`
+  - `/Users/bborn/projects/land-o-rama/README.md`
+  - `/Users/bborn/projects/land-o-rama/docs/API_SPEC.md`
+  - `/Users/bborn/projects/land-o-rama/docs/ARCHITECTURE.md`
+  - `/Users/bborn/projects/land-o-rama/docs/IMPLEMENTATION_BACKLOG.md`
+  - `/Users/bborn/projects/land-o-rama/docs/WORK_LOG.md`
+- Validation performed:
+  - `cd /Users/bborn/projects/land-o-rama && /opt/homebrew/bin/python3.13 -m compileall backend/app backend/tests backend/alembic` passed.
+  - `cd /Users/bborn/projects/land-o-rama/frontend && npm run test -- --run` passed (`14 passed`).
+  - `cd /Users/bborn/projects/land-o-rama/frontend && npm run build` passed.
+  - Not run: backend `pytest` due missing `pytest` package in current Python runtime.
+- Next recommended tasks:
+  - Add live Hunt source fixture replay tests that validate `scrape_artifacts` against real downloaded snapshots.
+  - Implement concrete Collin/Delta county adapters (currently registry stubs).
+  - Add scraper preflight endpoint/CLI for validating source URLs and parser readiness before scheduled runs.

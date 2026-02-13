@@ -72,7 +72,3 @@ Land-O-Rama is a local-first web application with:
 - Opportunity detail: dedicated tab with score factors, risks, source destination link, and feedback.
 - Digest history: latest + prior generated digests.
 - Runs/settings: operational health and scraper diagnostics (county coverage, parser status, degraded causes).
-
-## Transition Note
-- RapidAPI listings and market-metrics adapters are deprecated and scheduled for removal.
-- New ingestion work must target county scraper adapters; no new RapidAPI feature expansion.

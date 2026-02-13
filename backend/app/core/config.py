@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     auction_csv_glob: str = "*.csv"
     auction_max_file_age_days: int = 14
     scraper_mode: str = "download_first"
-    scraper_target_counties: str = "Hunt County,TX"
+    scraper_target_counties: str = "hunt"
     scraper_hunt_source_urls: str = ""
     scraper_download_dir: str = "/Users/bborn/land-o-rama/data/scraper_downloads"
     scraper_allowed_hosts: str = ""

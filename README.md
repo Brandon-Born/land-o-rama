@@ -6,7 +6,7 @@ Local-first investment research app for finding low-cost vacant land opportuniti
 Implemented MVP vertical slice:
 - FastAPI backend with SQLite persistence.
 - Live auction CSV ingestion pipeline with strict exclusion and explainable scoring.
-- Legacy RapidAPI listings/metrics adapters are still present in code but are now deprecated.
+- Live Hunt County, TX scraper-first ingestion path (download-first) with provenance capture.
 - Strict exclusion and explainable scoring engine.
 - Daily digest and run logging.
 - Threshold-based personalization training (`>= 50` feedback labels) with nightly retrain job.
@@ -24,8 +24,8 @@ Implemented MVP vertical slice:
 ## Data Source Pivot (Effective 2026-02-13)
 - Primary source direction: scrape county land/tax auction sources directly.
 - Initial live coverage target: Hunt County, Texas.
-- RapidAPI functionality is deprecated and scheduled for removal after Hunt County scraper parity.
-- During transition, existing RapidAPI modules may remain for compatibility, but new implementation work should target scraper adapters.
+- RapidAPI functionality has been removed from runtime and settings contracts.
+- County registry scaffold exists for adding additional Texas counties after Hunt stabilization.
 
 ## Stack
 - Backend: FastAPI + SQLAlchemy + APScheduler.
@@ -94,10 +94,11 @@ Supported canonical columns:
 
 Common aliases are accepted (`id`, `apn`, `winning_bid`, `acres`, `lat`, `lon`, etc.). Invalid rows are skipped and surfaced as degraded provider events.
 
-## RapidAPI Mode (Deprecated)
-- RapidAPI listing and market-metrics ingestion is deprecated for v1 direction.
-- Do not add new RapidAPI-dependent features.
-- Planned replacement path: county scraper adapters (starting Hunt County, TX), then county-by-county expansion.
+## Scraper Runtime Mode (Primary)
+- Set `LANDORAMA_AUCTION_SOURCE_MODE=scraper`.
+- Set `LANDORAMA_SCRAPER_TARGET_COUNTIES=hunt`.
+- Set `LANDORAMA_SCRAPER_HUNT_SOURCE_URLS` to one or more Hunt source CSV URLs or local file paths.
+- Runtime behavior: no-new-data days are marked `degraded` and prior successful opportunities remain the active dashboard data source.
 
 ## Database Migrations
 From `/Users/bborn/land-o-rama`:

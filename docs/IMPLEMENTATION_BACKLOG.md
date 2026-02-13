@@ -59,7 +59,7 @@ Acceptance:
 - Daily digest is generated and retrievable.
 - Retention job purges stale data only.
 
-## Phase 6: Hunt County Scraper Vertical Slice (Current Priority)
+## Phase 6: Hunt County Scraper Vertical Slice (Complete)
 Deliverables:
 - Introduce scraper-first provider interfaces:
   - `CountyAuctionScraperProvider` (fetch + parse)
@@ -77,7 +77,7 @@ Acceptance:
 - Runs/settings surfaces scraper diagnostics (attempted fetches, parse failures, coverage).
 - Empty/unavailable source triggers `degraded` with clear provider events, not silent failure.
 
-## Phase 7: Scraper Data Quality and Compliance Hardening
+## Phase 7: Scraper Data Quality and Compliance Hardening (In Progress)
 Deliverables:
 - Scraper guardrails: request throttling, retry/backoff, and source allowlist checks.
 - Parser contract tests for schema drift handling and failure classification.
@@ -89,7 +89,7 @@ Acceptance:
 - Re-running the same snapshot produces deterministic normalized outputs.
 - Run logs include county-level scrape coverage and parse quality metrics.
 
-## Phase 8: RapidAPI Deprecation and Removal
+## Phase 8: RapidAPI Deprecation and Removal (Complete)
 Deliverables:
 - Remove RapidAPI listing/metrics adapters from active pipeline wiring.
 - Remove `rapidapi_*`/listing-scan config from settings response and frontend provider panel.
@@ -101,7 +101,7 @@ Acceptance:
 - Test suite has no required RapidAPI dependencies.
 - Docs and code contracts no longer advertise RapidAPI as supported live ingestion.
 
-## Phase 9: County Expansion Framework (Post-Hunt)
+## Phase 9: County Expansion Framework (In Progress)
 Deliverables:
 - County registry configuration (enabled counties, source endpoints, parser bindings).
 - Add at least 2 additional Texas county scraper adapters after Hunt County stabilization.

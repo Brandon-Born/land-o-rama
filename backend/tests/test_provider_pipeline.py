@@ -8,6 +8,7 @@ from sqlalchemy import select
 from app.main import create_app
 from app.models import ConfigKV, MarketMetricDaily, ProviderRunEvent
 from app.providers.auctions import AuctionFetchStats, CsvAuctionProvider
+from app.providers.county_registry import build_county_registry
 from app.providers.hunt_county_scraper import HuntCountyDownloadFirstScraper
 from app.providers.mock_data import CandidateRecord, CountyMetric
 from app.services.pipeline import run_daily_pipeline
@@ -263,3 +264,16 @@ def test_hunt_scraper_download_first_parses_local_csv_and_dedupes(tmp_path) -> N
     assert len(result.artifacts) == 1
     assert result.artifacts[0].records_found == 3
     assert result.artifacts[0].records_accepted == 1
+
+
+def test_county_registry_enables_only_requested_targets(monkeypatch) -> None:
+    monkeypatch.setenv("LANDORAMA_SCRAPER_TARGET_COUNTIES", "hunt,collin")
+    from app.core.config import get_settings
+
+    get_settings.cache_clear()
+    registry = build_county_registry(get_settings())
+    enabled = [entry.label for entry in registry if entry.enabled]
+    assert "Hunt County, TX" in enabled
+    assert "Collin County, TX" in enabled
+    assert "Delta County, TX" not in enabled
+    get_settings.cache_clear()

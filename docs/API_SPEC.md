@@ -4,7 +4,7 @@ Base path: `/api/v1`
 
 ## Transition Status (2026-02-13)
 - Direction is now scraper-first with county auction ingestion as primary source.
-- RapidAPI-backed listings/metrics fields are deprecated and will be removed after scraper parity.
+- RapidAPI-backed listings/metrics fields have been removed from active runtime contracts.
 - Hunt County, TX is the first live county target.
 
 ## Endpoints
@@ -73,23 +73,19 @@ Run status values:
 Returns non-secret runtime settings and provider health.
 
 Provider settings/health fields:
-- `rapidapi_configured: boolean` (deprecated)
 - `regrid_configured: boolean`
-- `rapidapi_provider_slug: string` (deprecated)
-- `rapidapi_metrics_slug: string` (deprecated)
-- `listing_locations_count: number` (deprecated)
-- `listing_page_limit: number` (deprecated)
-- `listing_pages_per_location: number` (deprecated)
-- `listing_sort: string` (deprecated)
-- `listing_price_max: number` (deprecated)
+- `price_cap: number`
 - `auction_source_mode: string`
 - `auction_csv_dir: string`
 - `auction_csv_glob: string`
 - `auction_max_file_age_days: number`
-- `scraper_primary_source: string` (planned; `county_auction_scraper`)
-- `scraper_target_counties: string[]` (planned; starts with `["Hunt County, TX"]`)
-- `scraper_last_success_at: string | null` (planned ISO datetime)
-- `scraper_parse_error_count: number` (planned)
+- `scraper_primary_source: string` (`county_auction_scraper`)
+- `scraper_mode: string` (`download_first`)
+- `scraper_target_counties: string[]`
+- `scraper_last_success_at: string | null` (ISO datetime)
+- `scraper_last_success_county: string | null`
+- `scraper_parse_error_count: number`
+- `scraper_last_records_accepted: number`
 - `provider_timeout_seconds: number`
 - `provider_max_retries: number`
 - `market_metrics_cache_lookback_days: number`
@@ -101,9 +97,6 @@ Provider settings/health fields:
 
 ### `PUT /settings`
 Updates non-secret runtime settings (schedule time, provider toggles).
-
-Transition expectation:
-- Existing deployments may still return only legacy RapidAPI settings fields until scraper settings are implemented.
 
 ## Core Types
 - `OpportunityListItem`
