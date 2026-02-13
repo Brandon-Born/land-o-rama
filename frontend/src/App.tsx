@@ -584,17 +584,20 @@ export default function App() {
           {activeTab === "runs" && (
             <section className="tab-content runs-view">
               <article className="provider-strip card">
-                <h2>Provider Health</h2>
+                <h2>Scraper Health</h2>
                 <div className="provider-meta">
-                  <span>RapidAPI: {settings?.rapidapi_configured ? "Configured" : "Missing Key/Host"}</span>
+                  <span>Primary Source: {settings?.scraper_primary_source ?? "n/a"}</span>
+                  <span>Scraper Mode: {settings?.scraper_mode ?? "n/a"}</span>
+                  <span>Target Counties: {(settings?.scraper_target_counties ?? []).join(", ") || "n/a"}</span>
+                  <span>Last Accepted Records: {settings?.scraper_last_records_accepted ?? 0}</span>
+                  <span>Last Parse Errors: {settings?.scraper_parse_error_count ?? 0}</span>
+                  <span>
+                    Last Success:{" "}
+                    {settings?.scraper_last_success_at
+                      ? `${new Date(settings.scraper_last_success_at).toLocaleString()} (${settings.scraper_last_success_county ?? "n/a"})`
+                      : "n/a"}
+                  </span>
                   <span>Regrid: {settings?.regrid_configured ? "Configured" : "Missing Key"}</span>
-                  <span>Listing Slug: {settings?.rapidapi_provider_slug ?? "n/a"}</span>
-                  <span>Listing Locations: {settings?.listing_locations_count ?? 0}</span>
-                  <span>Listing Page Limit: {settings?.listing_page_limit ?? 0}</span>
-                  <span>Listing Pages/Location: {settings?.listing_pages_per_location ?? 0}</span>
-                  <span>Listing Sort: {settings?.listing_sort ?? "n/a"}</span>
-                  <span>Listing Price Cap: {settings?.listing_price_max ?? 0}</span>
-                  <span>Metrics Slug: {settings?.rapidapi_metrics_slug ?? "n/a"}</span>
                   <span>Auction Source: {settings?.auction_source_mode ?? "n/a"}</span>
                   <span>CSV Dir: {settings?.auction_csv_dir ?? "n/a"}</span>
                   <span>CSV Glob: {settings?.auction_csv_glob ?? "n/a"}</span>

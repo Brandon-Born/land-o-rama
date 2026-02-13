@@ -155,6 +155,13 @@ function defaultHandler(url: URL, init?: RequestInit): { status?: number; body: 
         provider_timeout_seconds: 12,
         provider_max_retries: 2,
         market_metrics_cache_lookback_days: 30,
+        scraper_primary_source: "county_auction_scraper",
+        scraper_mode: "download_first",
+        scraper_target_counties: ["Hunt County, TX"],
+        scraper_last_success_at: null,
+        scraper_last_success_county: null,
+        scraper_parse_error_count: 0,
+        scraper_last_records_accepted: 0,
         personalization_ready: false,
         feedback_labels_count: 0,
         personalization_threshold: 50,
@@ -340,6 +347,13 @@ it("renders provider health configuration and events", async () => {
           provider_timeout_seconds: 12,
           provider_max_retries: 2,
           market_metrics_cache_lookback_days: 30,
+          scraper_primary_source: "county_auction_scraper",
+          scraper_mode: "download_first",
+          scraper_target_counties: ["Hunt County, TX"],
+          scraper_last_success_at: "2026-02-10T00:02:00Z",
+          scraper_last_success_county: "Hunt",
+          scraper_parse_error_count: 2,
+          scraper_last_records_accepted: 11,
           personalization_ready: true,
           feedback_labels_count: 75,
           personalization_threshold: 50,
@@ -358,11 +372,12 @@ it("renders provider health configuration and events", async () => {
   await screen.findByRole("heading", { name: "Top Opportunities" });
   await user.click(screen.getByRole("button", { name: "Runs" }));
   await waitFor(() => {
-    expect(screen.getByText("RapidAPI: Configured")).toBeInTheDocument();
+    expect(screen.getByText("Primary Source: county_auction_scraper")).toBeInTheDocument();
+    expect(screen.getByText("Scraper Mode: download_first")).toBeInTheDocument();
+    expect(screen.getByText("Target Counties: Hunt County, TX")).toBeInTheDocument();
+    expect(screen.getByText("Last Accepted Records: 11")).toBeInTheDocument();
+    expect(screen.getByText("Last Parse Errors: 2")).toBeInTheDocument();
     expect(screen.getByText("Regrid: Missing Key")).toBeInTheDocument();
-    expect(screen.getByText("Listing Slug: for-sale")).toBeInTheDocument();
-    expect(screen.getByText("Listing Locations: 3")).toBeInTheDocument();
-    expect(screen.getByText("Metrics Slug: county-market-v2")).toBeInTheDocument();
     expect(screen.getByText("Auction Source: csv")).toBeInTheDocument();
     expect(screen.getByText(/Personalization: Ready/i)).toBeInTheDocument();
     expect(screen.getByText("provider timeout")).toBeInTheDocument();

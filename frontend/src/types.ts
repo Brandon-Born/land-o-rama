@@ -100,6 +100,13 @@ export type SettingsResponse = {
   provider_timeout_seconds: number;
   provider_max_retries: number;
   market_metrics_cache_lookback_days: number;
+  scraper_primary_source: string;
+  scraper_mode: string;
+  scraper_target_counties: string[];
+  scraper_last_success_at: string | null;
+  scraper_last_success_county: string | null;
+  scraper_parse_error_count: number;
+  scraper_last_records_accepted: number;
   personalization_ready: boolean;
   feedback_labels_count: number;
   personalization_threshold: number;
