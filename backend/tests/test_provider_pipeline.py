@@ -13,6 +13,7 @@ from app.models import ConfigKV, MarketMetricDaily, ProviderRunEvent, SyncRun
 from app.providers.listing_types import ListingFetchResult, ListingScanConfig
 from app.providers.mock_data import CandidateRecord, CountyMetric
 from app.providers.auctions import AuctionFetchStats, CsvAuctionProvider
+from app.providers.hunt_county_scraper import HuntCountyDownloadFirstScraper
 from app.providers.rapidapi_listings import RapidAPIListingProvider
 from app.providers.rapidapi_metrics import RapidAPIMarketMetricsProvider
 from app.services.pipeline import run_daily_pipeline
@@ -702,6 +703,37 @@ def test_csv_auction_provider_parses_source_destination_alias(tmp_path) -> None:
     assert len(candidates) == 1
     assert candidates[0].source_url == "https://example.test/auctions/A3"
     assert candidates[0].source_name == "County Tax Office"
+
+
+def test_hunt_scraper_download_first_parses_local_csv_and_dedupes(tmp_path) -> None:
+    source_csv = tmp_path / "hunt_source.csv"
+    source_csv.write_text(
+        "\n".join(
+            [
+                "auction_id,parcel_key,county,state,price,acreage,source_url",
+                "H1,HK-1,Hunt,TX,1700,0.2,https://example.test/auctions/H1",
+                "H1,HK-1,Hunt,TX,1700,0.2,https://example.test/auctions/H1",
+                "H2,HK-2,Hunt,TX,7000,0.2,https://example.test/auctions/H2",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    scraper = HuntCountyDownloadFirstScraper(
+        source_urls=[str(source_csv)],
+        download_dir=tmp_path / "downloads",
+        timeout_seconds=1.0,
+        request_interval_ms=0,
+        allowed_hosts=set(),
+    )
+
+    result = scraper.fetch(state="TX", counties=["Hunt County"], max_price=5000)
+    assert result.attempted_sources == 1
+    assert result.successful_sources == 1
+    assert len(result.candidates) == 1
+    assert result.candidates[0].external_id == "H1"
+    assert len(result.artifacts) == 1
+    assert result.artifacts[0].records_found == 3
+    assert result.artifacts[0].records_accepted == 1
 
 
 def test_auction_partial_parse_marks_run_degraded(session_factory, monkeypatch) -> None:

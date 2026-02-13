@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import Protocol
 
 from app.core.config import Settings
+from app.providers.county_scrapers import CountyScrapeResult, ScrapeArtifact
+from app.providers.hunt_county_scraper import HuntCountyDownloadFirstScraper
 from app.providers.mock_data import CandidateRecord, mock_candidates
 
 
@@ -192,10 +194,50 @@ class CsvAuctionProvider:
             self.last_stats.error_samples.append(message)
 
 
+@dataclass(slots=True)
+class ScraperAuctionProvider:
+    state: str
+    counties: list[str]
+    scraper: HuntCountyDownloadFirstScraper
+    provider_name: str = "county_auction_scraper"
+    last_stats: AuctionFetchStats = field(default_factory=AuctionFetchStats)
+    last_artifacts: list[ScrapeArtifact] = field(default_factory=list)
+
+    def fetch(self, state: str, max_price: float) -> list[CandidateRecord]:
+        result: CountyScrapeResult = self.scraper.fetch(
+            state=state or self.state,
+            counties=self.counties,
+            max_price=max_price,
+        )
+        self.last_artifacts = result.artifacts
+        rejected_rows = sum(artifact.records_rejected for artifact in result.artifacts)
+        accepted_rows = sum(artifact.records_accepted for artifact in result.artifacts)
+        scanned_rows = sum(artifact.records_found for artifact in result.artifacts)
+        self.last_stats = AuctionFetchStats(
+            scanned_rows=scanned_rows,
+            accepted_rows=accepted_rows,
+            rejected_rows=rejected_rows,
+            error_samples=result.warnings[:3],
+        )
+        return result.candidates
+
+
 def build_auction_provider(settings: Settings) -> AuctionProvider:
     source_mode = settings.auction_source_mode.strip().lower()
     if settings.mock_mode or source_mode == "mock":
         return MockAuctionProvider()
+    if source_mode == "scraper":
+        return ScraperAuctionProvider(
+            state=settings.default_state,
+            counties=settings.scraper_target_county_list,
+            scraper=HuntCountyDownloadFirstScraper(
+                source_urls=settings.scraper_hunt_source_url_list,
+                download_dir=Path(settings.scraper_download_dir),
+                timeout_seconds=settings.provider_timeout_seconds,
+                request_interval_ms=settings.scraper_request_interval_ms,
+                allowed_hosts=set(settings.scraper_allowed_host_list),
+            ),
+        )
     if source_mode == "csv":
         return CsvAuctionProvider(
             csv_dir=Path(settings.auction_csv_dir),
