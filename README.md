@@ -1,24 +1,31 @@
 # Land-O-Rama
 
-Local-first investment research app for finding low-cost vacant land listings with strong 5-year upside potential.
+Local-first investment research app for finding low-cost vacant land opportunities with strong 5-year upside potential.
 
 ## Current Status
 Implemented MVP vertical slice:
 - FastAPI backend with SQLite persistence.
-- Live listings (RapidAPI), live market metrics (RapidAPI), and live auction CSV ingestion pipeline.
+- Live auction CSV ingestion pipeline with strict exclusion and explainable scoring.
+- Legacy RapidAPI listings/metrics adapters are still present in code but are now deprecated.
 - Strict exclusion and explainable scoring engine.
 - Daily digest and run logging.
 - Threshold-based personalization training (`>= 50` feedback labels) with nightly retrain job.
 - React web UI for dashboard, detail review, digest, and runs.
 
 ## V1 Product Decisions (Locked)
-- Geography: Texas only.
-- Inventory: Listings + auctions.
+- Geography: Texas county-by-county, starting with Hunt County, TX.
+- Inventory: County auction data as primary source.
 - Focus: Buildable residential resale potential.
 - Delivery: Web dashboard + daily digest.
 - Data lifecycle: 24 months local history in SQLite.
 - Explainability: Score breakdown + reason codes.
 - Risk handling: Strict hard exclusions.
+
+## Data Source Pivot (Effective 2026-02-13)
+- Primary source direction: scrape county land/tax auction sources directly.
+- Initial live coverage target: Hunt County, Texas.
+- RapidAPI functionality is deprecated and scheduled for removal after Hunt County scraper parity.
+- During transition, existing RapidAPI modules may remain for compatibility, but new implementation work should target scraper adapters.
 
 ## Stack
 - Backend: FastAPI + SQLAlchemy + APScheduler.
@@ -77,7 +84,7 @@ cd /Users/bborn/land-o-rama/frontend
 npm run test
 ```
 
-## Live Auction CSV Mode
+## County Auction Ingestion Mode (Primary)
 Drop county auction files into your configured directory (default `/Users/bborn/land-o-rama/data/auction_feeds`).
 
 Supported canonical columns:
@@ -87,18 +94,10 @@ Supported canonical columns:
 
 Common aliases are accepted (`id`, `apn`, `winning_bid`, `acres`, `lat`, `lon`, etc.). Invalid rows are skipped and surfaced as degraded provider events.
 
-## Live Listings Mode (RapidAPI `for-sale`)
-For listings-first live scans, set:
-- `LANDORAMA_MOCK_MODE=false`
-- `LANDORAMA_RAPIDAPI_HOST=us-real-estate-listings.p.rapidapi.com`
-- `LANDORAMA_RAPIDAPI_PROVIDER_SLUG=for-sale`
-- `LANDORAMA_LISTING_LOCATIONS=Metairie, LA,22345`
-- `LANDORAMA_LISTING_PAGE_LIMIT=50`
-- `LANDORAMA_LISTING_PAGES_PER_LOCATION=2`
-- `LANDORAMA_LISTING_SORT=relevance`
-- `LANDORAMA_LISTING_PRICE_MAX=6000`
-
-The provider scans each location page-by-page (`offset` increments per page), forces `property_type=land`, and marks runs as `degraded` when some listing requests fail but usable candidates still exist.
+## RapidAPI Mode (Deprecated)
+- RapidAPI listing and market-metrics ingestion is deprecated for v1 direction.
+- Do not add new RapidAPI-dependent features.
+- Planned replacement path: county scraper adapters (starting Hunt County, TX), then county-by-county expansion.
 
 ## Database Migrations
 From `/Users/bborn/land-o-rama`:

@@ -2,7 +2,7 @@
 
 ## Candidate Prefilter
 - Accept vacant land/lot categories only.
-- Primary target: list price `<= $5,000`.
+- Primary target: auction price/winning bid `<= $5,000`.
 - Keep contextual near-threshold records up to `$6,000` for comps only.
 
 ## Hard Exclusions (Strict)
@@ -21,7 +21,7 @@ Any of the following removes a parcel from ranked output:
 - `accessibility_score`
   - Road access quality and proximity proxies to services/towns.
 - `liquidity_score`
-  - Turnover and marketability proxies (listing dynamics).
+  - Turnover and marketability proxies (auction cadence + county-level turnover signals).
 - `risk_penalty_score`
   - Non-fatal risk burden (higher = worse risk).
 
@@ -60,3 +60,7 @@ Each surfaced opportunity must expose:
 - Do not change weights without updating this file.
 - Any threshold change requires corresponding test updates.
 - Maintain deterministic outputs given fixed inputs.
+
+## Source Transition Constraint
+- During the scraper-first transition, keep formula weights unchanged unless explicitly re-baselined with tests.
+- RapidAPI-derived listing dynamics are deprecated; replacement features must be sourced from county auction and local county metrics inputs.

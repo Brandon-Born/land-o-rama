@@ -398,3 +398,27 @@
   - Add integration coverage asserting `GET /api/v1/settings` includes listing scan fields.
   - Add stricter location normalization for `LANDORAMA_LISTING_LOCATIONS` (city/state tokens and zip-only inputs).
   - Persist per-run listing request diagnostics (location/page attempt counts) for operational debugging.
+
+## 2026-02-13 - Scraper-First Direction Lock + RapidAPI Deprecation Plan
+- Task summary:
+  - Updated source-of-truth documentation to make county auction scraping the primary live ingestion strategy.
+  - Set Hunt County, TX as the first production scrape target for MVP live coverage.
+  - Marked RapidAPI listings/metrics functionality as deprecated and defined a phased removal plan.
+  - Reworked implementation backlog phases to prioritize Hunt County scraper vertical slice, scraper hardening, and RapidAPI removal.
+- Files changed:
+  - `/Users/bborn/projects/land-o-rama/AGENTS.md`
+  - `/Users/bborn/projects/land-o-rama/README.md`
+  - `/Users/bborn/projects/land-o-rama/docs/PROJECT_SPEC.md`
+  - `/Users/bborn/projects/land-o-rama/docs/ARCHITECTURE.md`
+  - `/Users/bborn/projects/land-o-rama/docs/SCORING_SPEC.md`
+  - `/Users/bborn/projects/land-o-rama/docs/API_SPEC.md`
+  - `/Users/bborn/projects/land-o-rama/docs/IMPLEMENTATION_BACKLOG.md`
+  - `/Users/bborn/projects/land-o-rama/docs/WORK_LOG.md`
+- Validation performed:
+  - Manual cross-doc consistency review for product direction, architecture, API transition notes, and backlog execution order.
+  - Confirmed RapidAPI is explicitly marked deprecated across top-level and spec docs.
+  - Not run: backend/frontend tests (documentation-only change).
+- Next recommended tasks:
+  - Implement Phase 6 Hunt County scraper vertical slice (`CountyAuctionScraperProvider` + Hunt parser + pipeline wiring).
+  - Add scraper diagnostics fields to `/api/v1/settings` and runs provider events.
+  - Begin Phase 8 removal by gating and then deleting RapidAPI pipeline paths after Hunt parity tests pass.

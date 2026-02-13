@@ -17,12 +17,15 @@ This file defines how future agents should continue implementation in this repo.
 - Keep v1 scoped to local single-user operation on macOS.
 - Preserve strict exclusion logic for high-risk parcels.
 - Keep explainability mandatory for surfaced opportunities.
+- Primary live data source is county auction scraping (pilot county: Hunt County, TX).
+- RapidAPI listings/metrics integrations are deprecated and should not receive new feature work.
 
 ## Execution Priority
 1. Implement smallest vertical slice that runs locally end-to-end.
 2. Prefer deterministic behavior over speculative ML complexity.
 3. Keep provider integrations pluggable via adapter interfaces.
 4. Ship mock-mode first, then live providers.
+5. Prioritize Hunt County scraper ingestion and deprecation/removal of RapidAPI paths.
 
 ## Required Engineering Practices
 - Use typed models for API payloads and DB entities.
