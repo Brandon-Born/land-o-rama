@@ -3,7 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from app.models import ConfigKV
 from app.services.validation import validate_hunt_pull
+from app.services.settings import ensure_default_settings
 
 
 def _write_csv(path: Path, rows: list[str]) -> None:
@@ -126,3 +128,72 @@ def test_hunt_pull_validation_report_written(session_factory, tmp_path) -> None:
     assert output.exists()
     payload = json.loads(output.read_text(encoding="utf-8"))
     assert payload["validation_id"] == report.validation_id
+
+
+def test_hunt_pull_validation_live_passes_when_rows_parsed_but_filtered(session_factory, tmp_path, monkeypatch) -> None:
+    fixture = tmp_path / "hunt_live_filtered.csv"
+    _write_csv(
+        fixture,
+        [
+            "auction_id,parcel_key,county,state,price,acreage,source_url",
+            "H-12,PK-12,Hunt,TX,7000,0.2,https://example.test/auctions/H-12",
+        ],
+    )
+    monkeypatch.setenv("LANDORAMA_MOCK_MODE", "false")
+    monkeypatch.setenv("LANDORAMA_AUCTION_SOURCE_MODE", "scraper")
+    monkeypatch.setenv("LANDORAMA_SCRAPER_TARGET_COUNTIES", "hunt")
+    monkeypatch.setenv("LANDORAMA_SCRAPER_HUNT_SOURCE_URLS", str(fixture))
+    monkeypatch.setenv("LANDORAMA_SCRAPER_DOWNLOAD_DIR", str(tmp_path / "downloads"))
+    monkeypatch.setenv("LANDORAMA_SCRAPER_ALLOWED_HOSTS", "")
+    monkeypatch.setenv("LANDORAMA_SCRAPER_REQUEST_INTERVAL_MS", "0")
+    monkeypatch.setenv("LANDORAMA_SCRAPER_MODE", "download_first")
+
+    with session_factory() as db:
+        ensure_default_settings(db)
+        db.get(ConfigKV, "mock_mode").value = "false"
+        db.commit()
+
+    report = validate_hunt_pull(
+        mode="live",
+        session_factory=session_factory,
+        output_path=tmp_path / "live_filtered_report.json",
+    )
+
+    assert report.passed
+    assert report.hunt_records_found >= 1
+    assert report.hunt_records_accepted == 0
+    assert any("none were accepted" in warning for warning in report.warning_samples)
+
+
+def test_hunt_pull_validation_live_strict_fails_on_filter_warning(session_factory, tmp_path, monkeypatch) -> None:
+    fixture = tmp_path / "hunt_live_filtered_strict.csv"
+    _write_csv(
+        fixture,
+        [
+            "auction_id,parcel_key,county,state,price,acreage,source_url",
+            "H-13,PK-13,Hunt,TX,7000,0.25,https://example.test/auctions/H-13",
+        ],
+    )
+    monkeypatch.setenv("LANDORAMA_MOCK_MODE", "false")
+    monkeypatch.setenv("LANDORAMA_AUCTION_SOURCE_MODE", "scraper")
+    monkeypatch.setenv("LANDORAMA_SCRAPER_TARGET_COUNTIES", "hunt")
+    monkeypatch.setenv("LANDORAMA_SCRAPER_HUNT_SOURCE_URLS", str(fixture))
+    monkeypatch.setenv("LANDORAMA_SCRAPER_DOWNLOAD_DIR", str(tmp_path / "downloads"))
+    monkeypatch.setenv("LANDORAMA_SCRAPER_ALLOWED_HOSTS", "")
+    monkeypatch.setenv("LANDORAMA_SCRAPER_REQUEST_INTERVAL_MS", "0")
+    monkeypatch.setenv("LANDORAMA_SCRAPER_MODE", "download_first")
+
+    with session_factory() as db:
+        ensure_default_settings(db)
+        db.get(ConfigKV, "mock_mode").value = "false"
+        db.commit()
+
+    report = validate_hunt_pull(
+        mode="live",
+        strict=True,
+        session_factory=session_factory,
+        output_path=tmp_path / "live_filtered_strict_report.json",
+    )
+
+    assert not report.passed
+    assert "Strict mode failed because scraper warnings were present." in report.failure_reasons

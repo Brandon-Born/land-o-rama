@@ -97,7 +97,10 @@ Common aliases are accepted (`id`, `apn`, `winning_bid`, `acres`, `lat`, `lon`, 
 ## Scraper Runtime Mode (Primary)
 - Set `LANDORAMA_AUCTION_SOURCE_MODE=scraper`.
 - Set `LANDORAMA_SCRAPER_TARGET_COUNTIES=hunt`.
-- Set `LANDORAMA_SCRAPER_HUNT_SOURCE_URLS` to one or more Hunt source CSV URLs or local file paths.
+- Set `LANDORAMA_SCRAPER_HUNT_SOURCE_URLS` to one or more Hunt source URLs or local file paths.
+- Current live parser coverage supports Hunt CSV and Hunt resale PDF (`hunt_pdf_v1`).
+- Recommended Hunt live URL: `https://www.pbfcm.com/docs/taxdocs/resales/huntcountytaxresale.pdf`.
+- Set `LANDORAMA_SCRAPER_ALLOWED_HOSTS=www.pbfcm.com` for strict host allowlisting.
 - Runtime behavior: no-new-data days are marked `degraded` and prior successful opportunities remain the active dashboard data source.
 
 ## Database Migrations
@@ -118,7 +121,9 @@ Direct script usage:
 
 Validation report output:
 - Default path: `/Users/bborn/projects/land-o-rama/data/validation/hunt_pull_<timestamp>.json`
-- Pass criteria: at least one accepted Hunt record, no scraper hard failure, and persisted Hunt scrape artifacts.
+- Fixture pass criteria: at least one accepted Hunt record, no scraper hard failure, and persisted Hunt scrape artifacts.
+- Live pass criteria: at least one parsed Hunt record with persisted Hunt scrape artifacts and no scraper hard failure.
+- Live runs with parsed rows but zero accepted rows are warning-pass (strict mode converts warnings to failure).
 
 ## Key API Endpoints
 - `GET /health`

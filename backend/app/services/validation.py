@@ -158,8 +158,14 @@ def validate_hunt_pull(
                     failure_reasons.append("County auction scraper reported a failed provider event.")
                 if hunt_artifact_count == 0:
                     failure_reasons.append("No Hunt scrape artifacts were persisted for the run.")
-                if hunt_records_accepted < 1:
+                if mode == "fixture" and hunt_records_accepted < 1:
                     failure_reasons.append("No accepted Hunt auction records were ingested.")
+                if mode == "live" and hunt_records_found < 1:
+                    failure_reasons.append("No parseable Hunt rows were ingested from live source.")
+                if mode == "live" and hunt_records_found > 0 and hunt_records_accepted < 1 and len(warning_samples) < 3:
+                    warning_samples.append(
+                        "Live source parsed Hunt records, but none were accepted after price-cap/exclusion filters."
+                    )
                 if strict and warning_samples:
                     failure_reasons.append("Strict mode failed because scraper warnings were present.")
         finally:

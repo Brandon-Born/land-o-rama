@@ -21,7 +21,7 @@ def main() -> int:
     parser.add_argument(
         "--env-file",
         type=Path,
-        default=Path(__file__).resolve().parents[2] / ".env",
+        default=BACKEND_ROOT / ".env",
         help="Env file to load before validation.",
     )
     parser.add_argument(

@@ -2,13 +2,15 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from app.main import create_app
 from app.models import ConfigKV, MarketMetricDaily, ProviderRunEvent
-from app.providers.auctions import AuctionFetchStats, CsvAuctionProvider
+from app.providers.auctions import AuctionFetchStats, CsvAuctionProvider, ScraperAuctionProvider
 from app.providers.county_registry import build_county_registry
+from app.providers.county_scrapers import CountyScrapeResult
 from app.providers.hunt_county_scraper import HuntCountyDownloadFirstScraper
 from app.providers.mock_data import CandidateRecord, CountyMetric
 from app.services.pipeline import run_daily_pipeline
@@ -264,6 +266,66 @@ def test_hunt_scraper_download_first_parses_local_csv_and_dedupes(tmp_path) -> N
     assert len(result.artifacts) == 1
     assert result.artifacts[0].records_found == 3
     assert result.artifacts[0].records_accepted == 1
+
+
+def test_hunt_scraper_download_first_parses_pdf_and_filters(tmp_path, monkeypatch) -> None:
+    source_pdf = tmp_path / "hunt_resale.pdf"
+    source_pdf.write_bytes(b"%PDF-1.4\n%fixture\n")
+    monkeypatch.setattr(
+        HuntCountyDownloadFirstScraper,
+        "_extract_pdf_text",
+        lambda self, _: (
+            "25095 S4430 ORIG TOWN OF WOLFE CITY BLK 43 LOT 6A \n"
+            "LOT 6 ACRES .2300 \n"
+            "WOLFE CITY $5,780.00 \n"
+            "25096 S4430 ORIG TOWN OF WOLFE CITY BLK 43 LOT 7A \n"
+            "LOT 7 ACRES .5000 \n"
+            "WOLFE CITY $12,000.00 \n"
+            "25095 S4430 ORIG TOWN OF WOLFE CITY BLK 43 LOT 6A \n"
+            "LOT 6 ACRES .2300 \n"
+            "WOLFE CITY $5,780.00"
+        ),
+    )
+    scraper = HuntCountyDownloadFirstScraper(
+        source_urls=[str(source_pdf)],
+        download_dir=tmp_path / "downloads",
+        timeout_seconds=1.0,
+        request_interval_ms=0,
+        allowed_hosts=set(),
+    )
+
+    result = scraper.fetch(state="TX", counties=["Hunt County"], max_price=6000)
+    assert result.attempted_sources == 1
+    assert result.successful_sources == 1
+    assert len(result.candidates) == 1
+    assert result.artifacts[0].parser_version == "hunt_pdf_v1"
+    assert result.artifacts[0].records_found == 3
+    assert result.artifacts[0].records_accepted == 1
+    assert result.artifacts[0].records_rejected == 1
+
+
+def test_scraper_provider_raises_when_all_sources_fail() -> None:
+    class FailingCountyScraper:
+        provider_name = "hunt_county_scraper"
+
+        def fetch(self, *, state: str, counties: list[str], max_price: float) -> CountyScrapeResult:  # noqa: ARG002
+            return CountyScrapeResult(
+                candidates=[],
+                warnings=["dns lookup failed"],
+                artifacts=[],
+                attempted_sources=1,
+                successful_sources=0,
+            )
+
+    provider = ScraperAuctionProvider(
+        state="TX",
+        counties=["Hunt County, TX"],
+        scraper=FailingCountyScraper(),  # type: ignore[arg-type]
+    )
+    with pytest.raises(RuntimeError, match="dns lookup failed"):
+        provider.fetch(state="TX", max_price=6000)
+    assert provider.last_artifacts == []
+    assert provider.last_stats.error_samples == ["dns lookup failed"]
 
 
 def test_county_registry_enables_only_requested_targets(monkeypatch) -> None:

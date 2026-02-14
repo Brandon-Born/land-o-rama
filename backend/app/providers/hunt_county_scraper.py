@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import re
 import time
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
 
 import httpx
+from pypdf import PdfReader
 
 from app.providers.county_scrapers import CountyScrapeResult, ScrapeArtifact, utcnow
 from app.providers.mock_data import CandidateRecord
@@ -20,8 +22,10 @@ class HuntCountyDownloadFirstScraper:
     timeout_seconds: float
     request_interval_ms: int
     allowed_hosts: set[str]
-    parser_version: str = "hunt_csv_v1"
+    parser_version_csv: str = "hunt_csv_v1"
+    parser_version_pdf: str = "hunt_pdf_v1"
     provider_name: str = "hunt_county_scraper"
+    source_name_pdf: str = "Hunt County Tax Resale PDF"
 
     _ALIASES = {
         "auction_id": ["auction_id", "id", "sale_id"],
@@ -66,7 +70,7 @@ class HuntCountyDownloadFirstScraper:
             attempted_sources += 1
             try:
                 local_path = self._download_to_local(source_url)
-                parsed_rows, _accepted_pre_dedupe, rejected, parsed_candidates = self._parse_csv(
+                parsed_rows, _accepted_pre_dedupe, rejected, parsed_candidates, parser_version = self._parse_source(
                     local_path,
                     state=state,
                     max_price=max_price,
@@ -89,7 +93,7 @@ class HuntCountyDownloadFirstScraper:
                         source_url=source_url,
                         local_path=str(local_path),
                         fetched_at=utcnow(),
-                        parser_version=self.parser_version,
+                        parser_version=parser_version,
                         checksum_sha256=checksum,
                         records_found=parsed_rows,
                         records_accepted=accepted,
@@ -138,10 +142,23 @@ class HuntCountyDownloadFirstScraper:
         target_path.write_bytes(content)
         return target_path
 
-    def _parse_csv(self, file_path: Path, *, state: str, max_price: float) -> tuple[int, int, int, list[CandidateRecord]]:
-        if file_path.suffix.lower() != ".csv":
-            raise RuntimeError(f"Unsupported file extension for Hunt parser: {file_path.suffix}")
+    def _parse_source(
+        self,
+        file_path: Path,
+        *,
+        state: str,
+        max_price: float,
+    ) -> tuple[int, int, int, list[CandidateRecord], str]:
+        suffix = file_path.suffix.lower()
+        if suffix == ".csv":
+            parsed_rows, accepted, rejected, candidates = self._parse_csv(file_path, state=state, max_price=max_price)
+            return parsed_rows, accepted, rejected, candidates, self.parser_version_csv
+        if suffix == ".pdf":
+            parsed_rows, accepted, rejected, candidates = self._parse_pdf(file_path, state=state, max_price=max_price)
+            return parsed_rows, accepted, rejected, candidates, self.parser_version_pdf
+        raise RuntimeError(f"Unsupported file extension for Hunt parser: {file_path.suffix}")
 
+    def _parse_csv(self, file_path: Path, *, state: str, max_price: float) -> tuple[int, int, int, list[CandidateRecord]]:
         parsed_rows = 0
         accepted = 0
         rejected = 0
@@ -161,6 +178,83 @@ class HuntCountyDownloadFirstScraper:
                 accepted += 1
                 candidates.append(parsed)
         return parsed_rows, accepted, rejected, candidates
+
+    def _parse_pdf(self, file_path: Path, *, state: str, max_price: float) -> tuple[int, int, int, list[CandidateRecord]]:
+        text = self._extract_pdf_text(file_path)
+        lines = [line.strip() for line in text.splitlines() if line.strip()]
+        if not lines:
+            raise RuntimeError("Unable to extract text from Hunt PDF.")
+        prop_row_pattern = re.compile(r"^(?P<prop_id>\d{5,})(?:\s+|$)")
+        acres_pattern = re.compile(r"ACRES?\s*(?P<acreage>\d*\.?\d+)", re.IGNORECASE)
+        money_pattern = re.compile(r"\$\s*(?P<market_value>[0-9,]+\.\d{2})")
+
+        prop_indices = [
+            idx
+            for idx, line in enumerate(lines)
+            if prop_row_pattern.match(line)
+        ]
+        if not prop_indices:
+            raise RuntimeError("No parseable Hunt resale rows were found in PDF source.")
+
+        parsed_rows = 0
+        accepted = 0
+        rejected = 0
+        candidates: list[CandidateRecord] = []
+        fallback_state = state.strip().upper()
+        for offset, start_idx in enumerate(prop_indices):
+            end_idx = prop_indices[offset + 1] if offset + 1 < len(prop_indices) else len(lines)
+            block = " ".join(lines[start_idx:end_idx])
+            prop_match = prop_row_pattern.match(lines[start_idx])
+            if prop_match is None:
+                continue
+
+            parsed_rows += 1
+            prop_id = prop_match.group("prop_id")
+            acreage_match = acres_pattern.search(block)
+            money_match = money_pattern.search(block)
+            acreage = _as_float(acreage_match.group("acreage") if acreage_match else None)
+            market_value = _as_float(money_match.group("market_value") if money_match else None)
+            if acreage <= 0 or market_value <= 0:
+                rejected += 1
+                continue
+
+            candidate = CandidateRecord(
+                source_type="auction",
+                source=self.provider_name,
+                external_id=f"HUNT-{prop_id}",
+                parcel_key=f"HUNT-{prop_id}",
+                county="Hunt",
+                state=fallback_state,
+                price=market_value,
+                acreage=acreage,
+                latitude=0.0,
+                longitude=0.0,
+                zoning="unknown",
+                legal_access=True,
+                utilities_hint="unknown",
+                flood_risk_level=0,
+                wetland_risk_level=0,
+                road_distance_miles=1.0,
+                days_on_market=1,
+                price_per_acre=(market_value / acreage),
+                source_name=self.source_name_pdf,
+                source_url=None,
+            )
+            if candidate.price > max_price:
+                continue
+            accepted += 1
+            candidates.append(candidate)
+
+        return parsed_rows, accepted, rejected, candidates
+
+    def _extract_pdf_text(self, file_path: Path) -> str:
+        reader = PdfReader(str(file_path))
+        text_parts: list[str] = []
+        for page in reader.pages:
+            extracted = page.extract_text() or ""
+            if extracted.strip():
+                text_parts.append(extracted)
+        return "\n".join(text_parts)
 
     def _to_candidate(self, *, row: dict[str, str], fallback_state: str) -> CandidateRecord | None:
         auction_id = self._read(row, "auction_id")

@@ -26,6 +26,7 @@ data/*.db-*
 data/*.sqlite
 data/*.sqlite-*
 data/runs/
+data/scraper_downloads/
 data/validation/
 
 # IDE

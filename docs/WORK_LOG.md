@@ -489,3 +489,30 @@
   - Wire live Hunt validation into a scheduled operator check and retain report history for trend monitoring.
   - Add fixture variants for future county adapters (Collin/Delta) as those parsers are implemented.
   - Add optional API endpoint to expose latest Hunt validation report metadata in the runs/settings UI.
+
+## 2026-02-14 - Hunt Live Ingestion Hardening (PDF Parser + Live Validation Policy)
+- Task summary:
+  - Added Hunt resale PDF parser support (`hunt_pdf_v1`) to the Hunt download-first scraper while preserving CSV parser behavior.
+  - Updated scraper provider semantics so all-source failures now raise hard provider failures instead of silently degrading with empty artifacts.
+  - Updated Hunt live validation policy to pass on parsed-row evidence with artifacts even when accepted rows are zero after price-cap filters.
+  - Updated operator configuration/docs to default Hunt source URL and allowlisted host for the live PDF endpoint.
+- Files changed:
+  - `/Users/bborn/projects/land-o-rama/backend/app/providers/hunt_county_scraper.py`
+  - `/Users/bborn/projects/land-o-rama/backend/app/providers/auctions.py`
+  - `/Users/bborn/projects/land-o-rama/backend/app/services/validation.py`
+  - `/Users/bborn/projects/land-o-rama/backend/scripts/validate_hunt_pull.py`
+  - `/Users/bborn/projects/land-o-rama/backend/tests/test_provider_pipeline.py`
+  - `/Users/bborn/projects/land-o-rama/backend/tests/test_hunt_pull_validation.py`
+  - `/Users/bborn/projects/land-o-rama/backend/requirements.txt`
+  - `/Users/bborn/projects/land-o-rama/backend/.env.example`
+  - `/Users/bborn/projects/land-o-rama/README.md`
+  - `/Users/bborn/projects/land-o-rama/docs/ARCHITECTURE.md`
+  - `/Users/bborn/projects/land-o-rama/docs/IMPLEMENTATION_BACKLOG.md`
+  - `/Users/bborn/projects/land-o-rama/docs/WORK_LOG.md`
+- Validation performed:
+  - `cd /Users/bborn/projects/land-o-rama/backend && LANDORAMA_DB_PATH=/Users/bborn/projects/land-o-rama/data/landorama.db .venv/bin/python -m pytest -q` passed (`35 passed`).
+  - `cd /Users/bborn/projects/land-o-rama && make validate-hunt-fixture` passed.
+  - Live validation against `https://www.pbfcm.com/docs/taxdocs/resales/huntcountytaxresale.pdf` passed with evidence artifact (`hunt_records_found=15`, `hunt_artifact_count=1`).
+- Next recommended tasks:
+  - Add structured extraction tests using a captured Hunt PDF fixture sample to stabilize regex/table parsing against source format drift.
+  - Add runs/settings UI status indicator for live warning-pass (`parsed > 0`, `accepted = 0`) to reduce operator confusion.

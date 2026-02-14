@@ -90,6 +90,7 @@ Acceptance:
 - Re-running the same snapshot produces deterministic normalized outputs.
 - Run logs include county-level scrape coverage and parse quality metrics.
 - Hunt validation passes when at least one Hunt record is accepted and artifacts are persisted.
+- Live Hunt validation passes when at least one Hunt row is parsed and artifacts are persisted (accepted-count can be zero due filters and is warning-pass).
 
 ## Phase 8: RapidAPI Deprecation and Removal (Complete)
 Deliverables:

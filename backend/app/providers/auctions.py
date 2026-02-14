@@ -220,6 +220,18 @@ class ScraperAuctionProvider:
             counties=self.counties,
             max_price=max_price,
         )
+        if result.attempted_sources > 0 and result.successful_sources == 0:
+            message = "All Hunt County sources failed."
+            if result.warnings:
+                message = " | ".join(result.warnings[:3])
+            self.last_artifacts = []
+            self.last_stats = AuctionFetchStats(
+                scanned_rows=0,
+                accepted_rows=0,
+                rejected_rows=0,
+                error_samples=result.warnings[:3],
+            )
+            raise RuntimeError(message)
         self.last_artifacts = result.artifacts
         rejected_rows = sum(artifact.records_rejected for artifact in result.artifacts)
         accepted_rows = sum(artifact.records_accepted for artifact in result.artifacts)
