@@ -589,6 +589,8 @@ export default function App() {
                   <span>Primary Source: {settings?.scraper_primary_source ?? "n/a"}</span>
                   <span>Scraper Mode: {settings?.scraper_mode ?? "n/a"}</span>
                   <span>Target Counties: {(settings?.scraper_target_counties ?? []).join(", ") || "n/a"}</span>
+                  <span>Enabled Counties: {(settings?.scraper_enabled_counties ?? []).join(", ") || "n/a"}</span>
+                  <span>County Failures: {settings?.scraper_county_failures ?? 0}</span>
                   <span>Last Accepted Records: {settings?.scraper_last_records_accepted ?? 0}</span>
                   <span>Last Parse Errors: {settings?.scraper_parse_error_count ?? 0}</span>
                   <span>
@@ -623,6 +625,33 @@ export default function App() {
                       </li>
                     ))}
                   </ul>
+                )}
+                {(settings?.scraper_county_coverage ?? []).length > 0 && (
+                  <>
+                    <h3>County Coverage</h3>
+                    <ul className="provider-list">
+                      {(settings?.scraper_county_coverage ?? []).map((coverage) => (
+                        <li key={coverage.county}>
+                          <strong>{coverage.county}</strong>
+                          <span className={`pill-${coverage.status}`}>{coverage.status}</span>
+                          <small>
+                            found={coverage.records_found}, accepted={coverage.records_accepted}, rejected=
+                            {coverage.records_rejected}
+                          </small>
+                          <small>
+                            min={coverage.min_price ?? "n/a"}, median={coverage.median_price ?? "n/a"}, max=
+                            {coverage.max_price ?? "n/a"}
+                          </small>
+                          <small>
+                            last success:{" "}
+                            {coverage.last_success_at
+                              ? new Date(coverage.last_success_at).toLocaleString()
+                              : "n/a"}
+                          </small>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
                 )}
               </article>
 

@@ -272,9 +272,8 @@ def test_hunt_scraper_download_first_parses_pdf_and_filters(tmp_path, monkeypatc
     source_pdf = tmp_path / "hunt_resale.pdf"
     source_pdf.write_bytes(b"%PDF-1.4\n%fixture\n")
     monkeypatch.setattr(
-        HuntCountyDownloadFirstScraper,
-        "_extract_pdf_text",
-        lambda self, _: (
+        "app.providers.parser_templates._extract_pdf_text",
+        lambda _: (
             "25095 S4430 ORIG TOWN OF WOLFE CITY BLK 43 LOT 6A \n"
             "LOT 6 ACRES .2300 \n"
             "WOLFE CITY $5,780.00 \n"
@@ -298,10 +297,28 @@ def test_hunt_scraper_download_first_parses_pdf_and_filters(tmp_path, monkeypatc
     assert result.attempted_sources == 1
     assert result.successful_sources == 1
     assert len(result.candidates) == 1
-    assert result.artifacts[0].parser_version == "hunt_pdf_v1"
+    assert result.artifacts[0].parser_version == "pdf_taxsale_v1"
     assert result.artifacts[0].records_found == 3
     assert result.artifacts[0].records_accepted == 1
     assert result.artifacts[0].records_rejected == 1
+
+
+def test_hunt_scraper_template_mismatch_reports_warning(tmp_path) -> None:
+    source_html = tmp_path / "county_source.html"
+    source_html.write_text("<html><body>county source</body></html>", encoding="utf-8")
+    scraper = HuntCountyDownloadFirstScraper(
+        source_urls=[str(source_html)],
+        download_dir=tmp_path / "downloads",
+        timeout_seconds=1.0,
+        request_interval_ms=0,
+        allowed_hosts=set(),
+    )
+
+    result = scraper.fetch(state="TX", counties=["Hunt County"], max_price=6000)
+    assert result.attempted_sources == 1
+    assert result.successful_sources == 0
+    assert not result.artifacts
+    assert any("not implemented" in warning for warning in result.warnings)
 
 
 def test_scraper_provider_raises_when_all_sources_fail() -> None:

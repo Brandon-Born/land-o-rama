@@ -86,6 +86,9 @@ Provider settings/health fields:
 - `scraper_last_success_county: string | null`
 - `scraper_parse_error_count: number`
 - `scraper_last_records_accepted: number`
+- `scraper_enabled_counties: string[]`
+- `scraper_county_coverage: ScraperCountyCoverage[]`
+- `scraper_county_failures: number`
 - `provider_timeout_seconds: number`
 - `provider_max_retries: number`
 - `market_metrics_cache_lookback_days: number`
@@ -111,6 +114,8 @@ Updates non-secret runtime settings (schedule time, provider toggles).
   - `id`, `run_type`, `status`, `started_at`, `finished_at`, `listings_ingested`, `auctions_ingested`, `candidates_scored`, `excluded_count`, `error_summary`, `provider_events`
 - `ProviderEventStatus`
   - `provider`, `status`, `error_summary`, `created_at`
+- `ScraperCountyCoverage`
+  - `county`, `last_success_at`, `records_found`, `records_accepted`, `records_rejected`, `min_price`, `median_price`, `max_price`, `status`
 
 ## Error Contract
 Consistent error envelope:

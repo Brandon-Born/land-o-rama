@@ -79,6 +79,16 @@ def run_daily_pipeline(
         else:
             live_auction_provider = auction_provider or build_auction_provider(runtime)
             live_metrics_provider = metrics_provider or build_market_metrics_provider(runtime)
+            catalog_warning = getattr(live_auction_provider, "catalog_warning", None)
+            if catalog_warning:
+                degraded = True
+                _record_provider_event(
+                    db,
+                    run.id,
+                    provider="county_source_catalog",
+                    status="degraded",
+                    error_summary=str(catalog_warning),
+                )
 
             _ = enrichment_provider
 
@@ -94,6 +104,31 @@ def run_daily_pipeline(
                     run_id=run.id,
                     provider=live_auction_provider.provider_name,
                     artifacts=scrape_artifacts,
+                )
+            county_coverage = getattr(live_auction_provider, "last_county_coverage", [])
+            if county_coverage:
+                failed_counties = [item.county for item in county_coverage if item.status == "failed"]
+                warning_counties = [item.county for item in county_coverage if item.status == "warning"]
+                if failed_counties:
+                    degraded = True
+                if warning_counties:
+                    degraded = True
+                summary = "; ".join(
+                    [
+                        (
+                            f"{item.county}: found={item.records_found}, accepted={item.records_accepted}, "
+                            f"rejected={item.records_rejected}, min={item.min_price}, "
+                            f"median={item.median_price}, max={item.max_price}, status={item.status}"
+                        )
+                        for item in county_coverage
+                    ]
+                )
+                _record_provider_event(
+                    db,
+                    run.id,
+                    provider="county_scrape_coverage",
+                    status="degraded" if failed_counties or warning_counties else "success",
+                    error_summary=summary,
                 )
             if auctions_error:
                 degraded = True
@@ -561,6 +596,9 @@ def _persist_scrape_artifacts(
                 records_found=artifact.records_found,
                 records_accepted=artifact.records_accepted,
                 records_rejected=artifact.records_rejected,
+                price_min=artifact.price_min,
+                price_median=artifact.price_median,
+                price_max=artifact.price_max,
             )
         )
     db.flush()

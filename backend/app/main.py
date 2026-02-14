@@ -10,7 +10,7 @@ from sqlalchemy.exc import OperationalError
 
 from app.api.routes import router as api_router
 from app.core.config import get_settings
-from app.db.session import SessionLocal
+from app.db.session import get_session_local
 from app.models import SyncRun
 from app.services.pipeline import run_daily_pipeline
 from app.services.personalization import train_if_threshold_met
@@ -27,11 +27,11 @@ def create_app(
     scheduler = BackgroundScheduler()
 
     def _run_job_wrapper() -> None:
-        with SessionLocal() as db:
+        with get_session_local()() as db:
             run_daily_pipeline(db)
 
     def _run_personalization_job_wrapper() -> None:
-        with SessionLocal() as db:
+        with get_session_local()() as db:
             train_if_threshold_met(db)
 
     def _schedule_jobs() -> None:
@@ -59,7 +59,7 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
-        with SessionLocal() as db:
+        with get_session_local()() as db:
             try:
                 ensure_default_settings(db)
             except OperationalError as exc:  # pragma: no cover - startup guardrail

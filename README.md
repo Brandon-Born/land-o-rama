@@ -96,11 +96,10 @@ Common aliases are accepted (`id`, `apn`, `winning_bid`, `acres`, `lat`, `lon`, 
 
 ## Scraper Runtime Mode (Primary)
 - Set `LANDORAMA_AUCTION_SOURCE_MODE=scraper`.
-- Set `LANDORAMA_SCRAPER_TARGET_COUNTIES=hunt`.
-- Set `LANDORAMA_SCRAPER_HUNT_SOURCE_URLS` to one or more Hunt source URLs or local file paths.
-- Current live parser coverage supports Hunt CSV and Hunt resale PDF (`hunt_pdf_v1`).
-- Recommended Hunt live URL: `https://www.pbfcm.com/docs/taxdocs/resales/huntcountytaxresale.pdf`.
-- Set `LANDORAMA_SCRAPER_ALLOWED_HOSTS=www.pbfcm.com` for strict host allowlisting.
+- Set `LANDORAMA_SCRAPER_TARGET_COUNTIES` to one or more counties (comma-separated).
+- Set `LANDORAMA_SOURCE_CATALOG_PATH` to your county source catalog (default `backend/config/county_sources.yaml`).
+- Parser templates now route by source binding (`csv_taxsale_v1`, `pdf_taxsale_v1`, `html_table_taxsale_v1` scaffold).
+- Recommended public-source mesh uses county/public resale publishers (no RapidAPI dependency).
 - Runtime behavior: no-new-data days are marked `degraded` and prior successful opportunities remain the active dashboard data source.
 
 ## Database Migrations
@@ -114,6 +113,15 @@ Two-tier validation workflow for Hunt County scraper ingestion:
   - `make validate-hunt-fixture`
 - Live validation (operational smoke check):
   - `make validate-hunt-live`
+
+## Multi-County Validation
+- Fixture validation (deterministic, all enabled/selected counties):
+  - `cd backend && .venv/bin/python scripts/validate_county_pull.py --mode fixture`
+- Live validation (operational smoke check):
+  - `cd backend && .venv/bin/python scripts/validate_county_pull.py --mode live`
+- Optional county filter:
+  - `--counties hunt,collin,delta`
+- Hunt-only validator remains available as a temporary compatibility alias and is deprecated.
 
 Direct script usage:
 - `cd backend && .venv/bin/python scripts/validate_hunt_pull.py --mode fixture`

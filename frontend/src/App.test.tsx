@@ -155,6 +155,21 @@ function defaultHandler(url: URL, init?: RequestInit): { status?: number; body: 
         scraper_last_success_county: null,
         scraper_parse_error_count: 0,
         scraper_last_records_accepted: 0,
+        scraper_enabled_counties: ["Hunt"],
+        scraper_county_coverage: [
+          {
+            county: "Hunt",
+            last_success_at: null,
+            records_found: 0,
+            records_accepted: 0,
+            records_rejected: 0,
+            min_price: null,
+            median_price: null,
+            max_price: null,
+            status: "failed",
+          },
+        ],
+        scraper_county_failures: 1,
         personalization_ready: false,
         feedback_labels_count: 0,
         personalization_threshold: 50,
@@ -340,6 +355,32 @@ it("renders provider health configuration and events", async () => {
           scraper_last_success_county: "Hunt",
           scraper_parse_error_count: 2,
           scraper_last_records_accepted: 11,
+          scraper_enabled_counties: ["Hunt", "Collin"],
+          scraper_county_coverage: [
+            {
+              county: "Hunt",
+              last_success_at: "2026-02-10T00:02:00Z",
+              records_found: 15,
+              records_accepted: 0,
+              records_rejected: 0,
+              min_price: 9130,
+              median_price: 46300,
+              max_price: 71920,
+              status: "warning",
+            },
+            {
+              county: "Collin",
+              last_success_at: null,
+              records_found: 0,
+              records_accepted: 0,
+              records_rejected: 0,
+              min_price: null,
+              median_price: null,
+              max_price: null,
+              status: "failed",
+            },
+          ],
+          scraper_county_failures: 1,
           personalization_ready: true,
           feedback_labels_count: 75,
           personalization_threshold: 50,
@@ -361,6 +402,8 @@ it("renders provider health configuration and events", async () => {
     expect(screen.getByText("Primary Source: county_auction_scraper")).toBeInTheDocument();
     expect(screen.getByText("Scraper Mode: download_first")).toBeInTheDocument();
     expect(screen.getByText("Target Counties: Hunt County, TX")).toBeInTheDocument();
+    expect(screen.getByText("Enabled Counties: Hunt, Collin")).toBeInTheDocument();
+    expect(screen.getByText("County Failures: 1")).toBeInTheDocument();
     expect(screen.getByText("Last Accepted Records: 11")).toBeInTheDocument();
     expect(screen.getByText("Last Parse Errors: 2")).toBeInTheDocument();
     expect(screen.getByText("Regrid: Missing Key")).toBeInTheDocument();
@@ -368,6 +411,8 @@ it("renders provider health configuration and events", async () => {
     expect(screen.getByText(/Personalization: Ready/i)).toBeInTheDocument();
     expect(screen.getByText("provider timeout")).toBeInTheDocument();
     expect(screen.getByText("missing api key")).toBeInTheDocument();
+    expect(screen.getByText("Hunt", { selector: "strong" })).toBeInTheDocument();
+    expect(screen.getByText("Collin", { selector: "strong" })).toBeInTheDocument();
   });
 });
 

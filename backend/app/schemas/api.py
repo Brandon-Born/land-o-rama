@@ -86,6 +86,18 @@ class ProviderEventStatus(BaseModel):
     created_at: datetime
 
 
+class ScraperCountyCoverage(BaseModel):
+    county: str
+    last_success_at: datetime | None = None
+    records_found: int = 0
+    records_accepted: int = 0
+    records_rejected: int = 0
+    min_price: float | None = None
+    median_price: float | None = None
+    max_price: float | None = None
+    status: str = "unknown"
+
+
 class RunStatus(BaseModel):
     id: str
     run_type: str
@@ -130,6 +142,9 @@ class SettingsResponse(BaseModel):
     scraper_last_success_county: str | None = None
     scraper_parse_error_count: int = 0
     scraper_last_records_accepted: int = 0
+    scraper_enabled_counties: list[str] = Field(default_factory=list)
+    scraper_county_coverage: list[ScraperCountyCoverage] = Field(default_factory=list)
+    scraper_county_failures: int = 0
     personalization_ready: bool = False
     feedback_labels_count: int = 0
     personalization_threshold: int = 50

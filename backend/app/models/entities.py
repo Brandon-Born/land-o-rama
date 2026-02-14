@@ -206,6 +206,9 @@ class ScrapeArtifact(Base):
     records_found: Mapped[int] = mapped_column(Integer, default=0)
     records_accepted: Mapped[int] = mapped_column(Integer, default=0)
     records_rejected: Mapped[int] = mapped_column(Integer, default=0)
+    price_min: Mapped[float | None] = mapped_column(Float, nullable=True)
+    price_median: Mapped[float | None] = mapped_column(Float, nullable=True)
+    price_max: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
 
     run: Mapped[SyncRun] = relationship(back_populates="scrape_artifacts")

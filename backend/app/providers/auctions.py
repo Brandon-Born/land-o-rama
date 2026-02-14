@@ -4,12 +4,13 @@ import csv
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from statistics import median
 from typing import Protocol
 
 from app.core.config import Settings
-from app.providers.county_registry import build_county_registry
+from app.providers.county_registry import CountyRegistryEntry, build_county_registry_with_warning
 from app.providers.county_scrapers import CountyScrapeResult, ScrapeArtifact
-from app.providers.hunt_county_scraper import HuntCountyDownloadFirstScraper
+from app.providers.hunt_county_scraper import HuntCountyDownloadFirstScraper, TemplateCountyDownloadFirstScraper
 from app.providers.mock_data import CandidateRecord, mock_candidates
 
 
@@ -26,6 +27,18 @@ class AuctionFetchStats:
     accepted_rows: int = 0
     rejected_rows: int = 0
     error_samples: list[str] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class CountyCoverageStatus:
+    county: str
+    status: str
+    records_found: int
+    records_accepted: int
+    records_rejected: int
+    min_price: float | None
+    median_price: float | None
+    max_price: float | None
 
 
 @dataclass(slots=True)
@@ -198,16 +211,30 @@ class CsvAuctionProvider:
 @dataclass(slots=True)
 class ScraperAuctionProvider:
     state: str
-    counties: list[str]
-    scraper: HuntCountyDownloadFirstScraper
+    registry: list[CountyRegistryEntry] = field(default_factory=list)
+    download_dir: Path | None = None
+    timeout_seconds: float = 12.0
+    request_interval_ms: int = 0
+    default_allowed_hosts: set[str] = field(default_factory=set)
+    catalog_warning: str | None = None
+    # Legacy compatibility fields retained for one release cycle.
+    counties: list[str] = field(default_factory=list)
+    scraper: HuntCountyDownloadFirstScraper | None = None
     provider_name: str = "county_auction_scraper"
     last_stats: AuctionFetchStats = field(default_factory=AuctionFetchStats)
     last_artifacts: list[ScrapeArtifact] = field(default_factory=list)
+    last_county_coverage: list[CountyCoverageStatus] = field(default_factory=list)
 
     def fetch(self, state: str, max_price: float) -> list[CandidateRecord]:
+        if self.scraper is not None:
+            return self._fetch_legacy(state=state, max_price=max_price)
+        return self._fetch_multi_county(state=state, max_price=max_price)
+
+    def _fetch_legacy(self, *, state: str, max_price: float) -> list[CandidateRecord]:
         hunt_enabled = any("hunt" in county.lower() for county in self.counties)
         if not hunt_enabled:
             self.last_artifacts = []
+            self.last_county_coverage = []
             self.last_stats = AuctionFetchStats(
                 scanned_rows=0,
                 accepted_rows=0,
@@ -225,6 +252,7 @@ class ScraperAuctionProvider:
             if result.warnings:
                 message = " | ".join(result.warnings[:3])
             self.last_artifacts = []
+            self.last_county_coverage = []
             self.last_stats = AuctionFetchStats(
                 scanned_rows=0,
                 accepted_rows=0,
@@ -236,6 +264,7 @@ class ScraperAuctionProvider:
         rejected_rows = sum(artifact.records_rejected for artifact in result.artifacts)
         accepted_rows = sum(artifact.records_accepted for artifact in result.artifacts)
         scanned_rows = sum(artifact.records_found for artifact in result.artifacts)
+        self.last_county_coverage = _build_county_coverage(result.artifacts)
         self.last_stats = AuctionFetchStats(
             scanned_rows=scanned_rows,
             accepted_rows=accepted_rows,
@@ -244,24 +273,129 @@ class ScraperAuctionProvider:
         )
         return result.candidates
 
+    def _fetch_multi_county(self, *, state: str, max_price: float) -> list[CandidateRecord]:
+        enabled_entries = [entry for entry in self.registry if entry.enabled]
+        if not enabled_entries:
+            self.last_artifacts = []
+            self.last_county_coverage = []
+            self.last_stats = AuctionFetchStats(
+                scanned_rows=0,
+                accepted_rows=0,
+                rejected_rows=0,
+                error_samples=["No enabled county targets were found in source catalog."],
+            )
+            return []
+
+        all_candidates: list[CandidateRecord] = []
+        all_artifacts: list[ScrapeArtifact] = []
+        warnings: list[str] = []
+        county_failures = 0
+        failed_counties: list[str] = []
+        for entry in enabled_entries:
+            if not entry.sources:
+                county_failures += 1
+                failed_counties.append(entry.county)
+                warnings.append(f"{entry.county}: no source bindings configured")
+                continue
+            scraper = TemplateCountyDownloadFirstScraper(
+                county=entry.county,
+                state=entry.state or (state or self.state),
+                source_bindings=entry.sources,
+                download_dir=self.download_dir or Path("/tmp"),
+                timeout_seconds=self.timeout_seconds,
+                request_interval_ms=self.request_interval_ms,
+                default_allowed_hosts=self.default_allowed_hosts,
+                provider_name=self.provider_name,
+            )
+            result = scraper.fetch(max_price=max_price)
+            if result.attempted_sources > 0 and result.successful_sources == 0:
+                county_failures += 1
+                failed_counties.append(entry.county)
+                if result.warnings:
+                    warnings.append(f"{entry.county}: {' | '.join(result.warnings[:2])}")
+                else:
+                    warnings.append(f"{entry.county}: all configured sources failed")
+                continue
+            if result.warnings:
+                warnings.extend([f"{entry.county}: {message}" for message in result.warnings[:2]])
+            all_artifacts.extend(result.artifacts)
+            all_candidates.extend(result.candidates)
+
+        if self.catalog_warning:
+            warnings.append(self.catalog_warning)
+
+        if county_failures == len(enabled_entries):
+            self.last_artifacts = []
+            self.last_county_coverage = []
+            self.last_stats = AuctionFetchStats(
+                scanned_rows=0,
+                accepted_rows=0,
+                rejected_rows=0,
+                error_samples=warnings[:3],
+            )
+            raise RuntimeError("All county sources failed. " + " | ".join(warnings[:3]))
+
+        deduped_candidates: list[CandidateRecord] = []
+        seen_keys: set[tuple[str, str, str]] = set()
+        global_dedupe_rejected = 0
+        for candidate in all_candidates:
+            dedupe_key = (candidate.state, candidate.parcel_key, candidate.external_id)
+            if dedupe_key in seen_keys:
+                global_dedupe_rejected += 1
+                continue
+            seen_keys.add(dedupe_key)
+            deduped_candidates.append(candidate)
+
+        self.last_artifacts = all_artifacts
+        coverage = _build_county_coverage(all_artifacts)
+        covered_counties = {item.county for item in coverage}
+        for county in failed_counties:
+            if county in covered_counties:
+                continue
+            coverage.append(
+                CountyCoverageStatus(
+                    county=county,
+                    status="failed",
+                    records_found=0,
+                    records_accepted=0,
+                    records_rejected=0,
+                    min_price=None,
+                    median_price=None,
+                    max_price=None,
+                )
+            )
+        coverage.sort(key=lambda item: item.county)
+        self.last_county_coverage = coverage
+        rejected_rows = sum(artifact.records_rejected for artifact in all_artifacts) + global_dedupe_rejected
+        accepted_rows = len(deduped_candidates)
+        scanned_rows = sum(artifact.records_found for artifact in all_artifacts)
+        self.last_stats = AuctionFetchStats(
+            scanned_rows=scanned_rows,
+            accepted_rows=accepted_rows,
+            rejected_rows=rejected_rows,
+            error_samples=warnings[:3],
+        )
+        return deduped_candidates
+
 
 def build_auction_provider(settings: Settings) -> AuctionProvider:
     source_mode = settings.auction_source_mode.strip().lower()
     if settings.mock_mode or source_mode == "mock":
         return MockAuctionProvider()
     if source_mode == "scraper":
-        registry = build_county_registry(settings)
+        registry, catalog_warning = build_county_registry_with_warning(settings)
         enabled_counties = [entry.label for entry in registry if entry.enabled]
+        if not enabled_counties:
+            enabled_counties = settings.scraper_target_county_list
         return ScraperAuctionProvider(
             state=settings.default_state,
+            registry=registry,
             counties=enabled_counties,
-            scraper=HuntCountyDownloadFirstScraper(
-                source_urls=settings.scraper_hunt_source_url_list,
-                download_dir=Path(settings.scraper_download_dir),
-                timeout_seconds=settings.provider_timeout_seconds,
-                request_interval_ms=settings.scraper_request_interval_ms,
-                allowed_hosts=set(settings.scraper_allowed_host_list),
-            ),
+            download_dir=Path(settings.scraper_download_dir),
+            timeout_seconds=settings.provider_timeout_seconds,
+            request_interval_ms=settings.scraper_request_interval_ms,
+            default_allowed_hosts=set(settings.scraper_allowed_host_list),
+            catalog_warning=catalog_warning,
         )
     if source_mode == "csv":
         return CsvAuctionProvider(
@@ -292,3 +426,37 @@ def _as_bool(value: str | None, *, default: bool) -> bool:
     if normalized in {"false", "f", "0", "no", "n"}:
         return False
     return default
+
+
+def _build_county_coverage(artifacts: list[ScrapeArtifact]) -> list[CountyCoverageStatus]:
+    buckets: dict[str, list[ScrapeArtifact]] = {}
+    for artifact in artifacts:
+        buckets.setdefault(artifact.county, []).append(artifact)
+
+    coverage: list[CountyCoverageStatus] = []
+    for county, county_artifacts in sorted(buckets.items()):
+        found = sum(artifact.records_found for artifact in county_artifacts)
+        accepted = sum(artifact.records_accepted for artifact in county_artifacts)
+        rejected = sum(artifact.records_rejected for artifact in county_artifacts)
+        mins = [artifact.price_min for artifact in county_artifacts if artifact.price_min is not None]
+        medians = [artifact.price_median for artifact in county_artifacts if artifact.price_median is not None]
+        maxes = [artifact.price_max for artifact in county_artifacts if artifact.price_max is not None]
+        if accepted > 0:
+            status = "success"
+        elif found > 0:
+            status = "warning"
+        else:
+            status = "failed"
+        coverage.append(
+            CountyCoverageStatus(
+                county=county,
+                status=status,
+                records_found=found,
+                records_accepted=accepted,
+                records_rejected=rejected,
+                min_price=min(mins) if mins else None,
+                median_price=float(median(medians)) if medians else None,
+                max_price=max(maxes) if maxes else None,
+            )
+        )
+    return coverage

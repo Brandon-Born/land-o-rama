@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 PYTHON_BIN ?= /opt/homebrew/bin/python3.13
 
-.PHONY: backend-bootstrap frontend-bootstrap setup dev backend-install backend-dev frontend-install frontend-dev test test-api db-upgrade db-revision validate-hunt-fixture validate-hunt-live
+.PHONY: backend-bootstrap frontend-bootstrap setup dev backend-install backend-dev frontend-install frontend-dev test test-api db-upgrade db-revision validate-hunt-fixture validate-hunt-live validate-county-fixture validate-county-live
 
 backend-bootstrap:
 	cd backend && \
@@ -54,3 +54,9 @@ validate-hunt-fixture:
 
 validate-hunt-live:
 	cd backend && .venv/bin/python scripts/validate_hunt_pull.py --mode live
+
+validate-county-fixture:
+	cd backend && .venv/bin/python scripts/validate_county_pull.py --mode fixture
+
+validate-county-live:
+	cd backend && .venv/bin/python scripts/validate_county_pull.py --mode live

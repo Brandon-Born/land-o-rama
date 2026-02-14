@@ -1,0 +1,56 @@
+version: 1
+counties:
+  - label: Hunt County, TX
+    county: Hunt
+    state: TX
+    sources:
+      - url: https://www.pbfcm.com/docs/taxdocs/resales/huntcountytaxresale.pdf
+        parser_template_key: pdf_taxsale_v1
+        allowed_hosts: [www.pbfcm.com]
+        priority: 10
+        source_name: PBFCM Hunt Tax Resale
+  - label: Collin County, TX
+    county: Collin
+    state: TX
+    sources:
+      - url: https://www.pbfcm.com/docs/taxdocs/resales/collincountytaxresale.pdf
+        parser_template_key: pdf_taxsale_v1
+        allowed_hosts: [www.pbfcm.com]
+        priority: 10
+        source_name: PBFCM Collin Tax Resale
+  - label: Delta County, TX
+    county: Delta
+    state: TX
+    sources:
+      - url: https://www.pbfcm.com/docs/taxdocs/resales/deltacountytaxresale.pdf
+        parser_template_key: pdf_taxsale_v1
+        allowed_hosts: [www.pbfcm.com]
+        priority: 10
+        source_name: PBFCM Delta Tax Resale
+  - label: Fannin County, TX
+    county: Fannin
+    state: TX
+    sources:
+      - url: https://www.pbfcm.com/docs/taxdocs/resales/fannincountytaxresale.pdf
+        parser_template_key: pdf_taxsale_v1
+        allowed_hosts: [www.pbfcm.com]
+        priority: 10
+        source_name: PBFCM Fannin Tax Resale
+  - label: Hopkins County, TX
+    county: Hopkins
+    state: TX
+    sources:
+      - url: https://www.pbfcm.com/docs/taxdocs/resales/hopkinscountytaxresale.pdf
+        parser_template_key: pdf_taxsale_v1
+        allowed_hosts: [www.pbfcm.com]
+        priority: 10
+        source_name: PBFCM Hopkins Tax Resale
+  - label: Rains County, TX
+    county: Rains
+    state: TX
+    sources:
+      - url: https://www.pbfcm.com/docs/taxdocs/resales/rainscountytaxresale.pdf
+        parser_template_key: pdf_taxsale_v1
+        allowed_hosts: [www.pbfcm.com]
+        priority: 10
+        source_name: PBFCM Rains Tax Resale

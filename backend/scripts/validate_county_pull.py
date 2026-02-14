@@ -14,10 +14,9 @@ from app.services.validation import validate_county_pull
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Validate Hunt County auction pull and emit a JSON report. (Deprecated alias; prefer validate_county_pull.py)"
-    )
+    parser = argparse.ArgumentParser(description="Validate county auction pulls and emit a JSON report.")
     parser.add_argument("--mode", choices=["fixture", "live"], required=True, help="Validation mode.")
+    parser.add_argument("--counties", default="", help="Comma-separated county filters (default: runtime targets).")
     parser.add_argument("--output", type=Path, default=None, help="Optional report output path.")
     parser.add_argument("--strict", action="store_true", help="Fail validation when warnings are present.")
     parser.add_argument(
@@ -30,17 +29,14 @@ def main() -> int:
         "--fixture-path",
         type=Path,
         default=None,
-        help="Override fixture path for fixture mode.",
+        help="Optional fixture source file for fixture mode.",
     )
     args = parser.parse_args()
+    counties = [item.strip() for item in args.counties.split(",") if item.strip()]
 
-    print(
-        "Warning: validate_hunt_pull.py is deprecated; use scripts/validate_county_pull.py --counties hunt",
-        file=sys.stderr,
-    )
     report = validate_county_pull(
         mode=args.mode,
-        counties=["hunt"],
+        counties=counties,
         strict=args.strict,
         output_path=args.output,
         env_file=args.env_file,

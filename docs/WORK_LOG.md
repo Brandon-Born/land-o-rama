@@ -516,3 +516,74 @@
 - Next recommended tasks:
   - Add structured extraction tests using a captured Hunt PDF fixture sample to stabilize regex/table parsing against source format drift.
   - Add runs/settings UI status indicator for live warning-pass (`parsed > 0`, `accepted = 0`) to reduce operator confusion.
+
+## 2026-02-14 - Multi-County Public-Source Mesh Direction Lock (Docs/Contracts First)
+- Task summary:
+  - Locked generalized multi-county ingestion direction: template-driven parser routing from a file-backed source catalog.
+  - Confirmed pricing-first rollout strategy for county expansion and validation policy for warning-pass live runs.
+  - Updated architecture, API contract, backlog, and README to orient future work away from one-off county parser wiring.
+- Files changed:
+  - `/Users/bborn/projects/land-o-rama/docs/ARCHITECTURE.md`
+  - `/Users/bborn/projects/land-o-rama/docs/API_SPEC.md`
+  - `/Users/bborn/projects/land-o-rama/docs/IMPLEMENTATION_BACKLOG.md`
+  - `/Users/bborn/projects/land-o-rama/README.md`
+  - `/Users/bborn/projects/land-o-rama/docs/WORK_LOG.md`
+- Validation performed:
+  - Documentation contract alignment check against current provider/settings architecture.
+- Next recommended tasks:
+  - Implement source catalog loader + registry fallback behavior.
+  - Implement parser template registry and county-agnostic scraper orchestration.
+  - Generalize validation CLI/report to multi-county coverage.
+
+## 2026-02-14 - Multi-County Source Mesh Implementation (Catalog + Templates + Validation)
+- Task summary:
+  - Implemented template-driven multi-county ingestion across Hunt, Collin, Delta, Fannin, Hopkins, and Rains using a typed source catalog.
+  - Reworked scraper orchestration to run county-by-county with county coverage diagnostics and price summary metrics persisted in `scrape_artifacts`.
+  - Added generalized county pull validator CLI/report (`validate_county_pull.py`) and kept Hunt validator as a compatibility alias.
+  - Extended settings contract/UI with county coverage diagnostics and county failure counts.
+  - Hardened runtime/session behavior by removing validator env leakage and making DB session binding follow effective runtime settings.
+- Files changed:
+  - `/Users/bborn/projects/land-o-rama/README.md`
+  - `/Users/bborn/projects/land-o-rama/Makefile`
+  - `/Users/bborn/projects/land-o-rama/backend/.env.example`
+  - `/Users/bborn/projects/land-o-rama/backend/app/core/config.py`
+  - `/Users/bborn/projects/land-o-rama/backend/app/db/session.py`
+  - `/Users/bborn/projects/land-o-rama/backend/app/main.py`
+  - `/Users/bborn/projects/land-o-rama/backend/app/models/entities.py`
+  - `/Users/bborn/projects/land-o-rama/backend/app/providers/__init__.py`
+  - `/Users/bborn/projects/land-o-rama/backend/app/providers/auctions.py`
+  - `/Users/bborn/projects/land-o-rama/backend/app/providers/county_registry.py`
+  - `/Users/bborn/projects/land-o-rama/backend/app/providers/county_scrapers.py`
+  - `/Users/bborn/projects/land-o-rama/backend/app/providers/hunt_county_scraper.py`
+  - `/Users/bborn/projects/land-o-rama/backend/app/providers/parser_templates.py`
+  - `/Users/bborn/projects/land-o-rama/backend/app/providers/source_catalog.py`
+  - `/Users/bborn/projects/land-o-rama/backend/app/schemas/api.py`
+  - `/Users/bborn/projects/land-o-rama/backend/app/services/pipeline.py`
+  - `/Users/bborn/projects/land-o-rama/backend/app/services/settings.py`
+  - `/Users/bborn/projects/land-o-rama/backend/app/services/validation.py`
+  - `/Users/bborn/projects/land-o-rama/backend/config/county_sources.yaml`
+  - `/Users/bborn/projects/land-o-rama/backend/scripts/validate_county_pull.py`
+  - `/Users/bborn/projects/land-o-rama/backend/scripts/validate_hunt_pull.py`
+  - `/Users/bborn/projects/land-o-rama/backend/tests/test_county_pull_validation.py`
+  - `/Users/bborn/projects/land-o-rama/backend/tests/test_hunt_pull_validation.py`
+  - `/Users/bborn/projects/land-o-rama/backend/tests/test_provider_pipeline.py`
+  - `/Users/bborn/projects/land-o-rama/backend/tests/test_source_catalog.py`
+  - `/Users/bborn/projects/land-o-rama/backend/alembic/versions/0005_scrape_artifact_price_summary.py`
+  - `/Users/bborn/projects/land-o-rama/frontend/src/App.tsx`
+  - `/Users/bborn/projects/land-o-rama/frontend/src/App.test.tsx`
+  - `/Users/bborn/projects/land-o-rama/frontend/src/types.ts`
+  - `/Users/bborn/projects/land-o-rama/docs/API_SPEC.md`
+  - `/Users/bborn/projects/land-o-rama/docs/ARCHITECTURE.md`
+  - `/Users/bborn/projects/land-o-rama/docs/IMPLEMENTATION_BACKLOG.md`
+  - `/Users/bborn/projects/land-o-rama/docs/WORK_LOG.md`
+- Validation performed:
+  - `cd /Users/bborn/projects/land-o-rama/backend && LANDORAMA_DB_PATH=/Users/bborn/projects/land-o-rama/data/land_o_rama.db .venv/bin/pytest -q` passed (`42 passed`).
+  - `cd /Users/bborn/projects/land-o-rama/frontend && npm test -- --run` passed (`14 passed`).
+  - `cd /Users/bborn/projects/land-o-rama/backend && LANDORAMA_DB_PATH=/Users/bborn/projects/land-o-rama/data/land_o_rama.db .venv/bin/python -m compileall app scripts tests` passed.
+  - `cd /Users/bborn/projects/land-o-rama/backend && .venv/bin/python scripts/validate_county_pull.py --mode fixture --counties hunt --output /Users/bborn/projects/land-o-rama/data/validation/fixture_check.json` passed.
+  - `cd /Users/bborn/projects/land-o-rama/backend && .venv/bin/python scripts/validate_county_pull.py --mode live --counties hunt --output /Users/bborn/projects/land-o-rama/data/validation/live_check_hunt.json` passed (real-source pull; warning-pass with parsed records).
+  - `cd /Users/bborn/projects/land-o-rama/backend && .venv/bin/python scripts/validate_county_pull.py --mode live --counties hunt,collin,delta,fannin,hopkins,rains --output /Users/bborn/projects/land-o-rama/data/validation/live_check_rollout6.json` failed as expected under current sources (`1/6` counties passing; rollout threshold not met).
+- Next recommended tasks:
+  - Add and verify reachable public sources for Collin/Delta/Fannin/Hopkins/Rains to meet the `>=4/6` live validation threshold.
+  - Improve parser coverage for non-Hunt county formats (including `html_table_taxsale_v1` implementation where needed).
+  - Add a small operator runbook section for interpreting warning-pass days when `accepted=0` but `records_found>0`.

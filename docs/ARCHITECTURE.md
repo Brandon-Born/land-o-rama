@@ -35,6 +35,24 @@ Land-O-Rama is a local-first web application with:
 - `Scheduler`
   - Executes daily pipeline, nightly personalization training, and retention purge.
 
+## Template-Driven County Ingestion
+- `Source Catalog`
+  - File-backed county/source registry (`backend/config/county_sources.yaml`) defines county bindings, parser templates, source URLs, and allowlists.
+  - Runtime filters enabled entries by `LANDORAMA_SCRAPER_TARGET_COUNTIES`.
+  - Backward compatibility mode falls back to legacy Hunt env settings when the catalog file is unavailable.
+- `Parser Templates`
+  - `csv_taxsale_v1`: alias-aware CSV parser for tax sale exports.
+  - `pdf_taxsale_v1`: line-block PDF parser for public resale lists.
+  - `html_table_taxsale_v1`: scaffolded template for future table-based county pages.
+- `County Routing`
+  - Scraper orchestration iterates enabled counties and all configured sources per county.
+  - Parser selection is source-template driven (`parser_template_key`) instead of county hardcoding.
+  - Dedupe identity remains `(state, parcel_key, external_id)` across all counties.
+- `Coverage Metrics`
+  - Provenance persists per source and county in `scrape_artifacts`.
+  - Settings endpoint surfaces county coverage diagnostics (records found/accepted/rejected and price summaries).
+  - Live validation reports include county-level pass/warn/fail outcomes and source coverage.
+
 ## Data Flow
 1. Fetch county auction source pages/files from scraper adapters (Hunt County first).
 2. Parse and normalize records into canonical parcel-oriented schema.

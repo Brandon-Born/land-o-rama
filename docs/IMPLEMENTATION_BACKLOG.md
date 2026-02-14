@@ -105,15 +105,48 @@ Acceptance:
 - Docs and code contracts no longer advertise RapidAPI as supported live ingestion.
 
 ## Phase 9: County Expansion Framework (In Progress)
+### 9.1 Source Catalog and County Registry
 Deliverables:
-- County registry configuration (enabled counties, source endpoints, parser bindings).
-- Add at least 2 additional Texas county scraper adapters after Hunt County stabilization.
-- Update scheduler to execute enabled county scrapes with per-county run diagnostics.
+- Add file-backed source catalog (`backend/config/county_sources.yaml`) as source-of-truth for county bindings.
+- Registry loader validates parser template keys, URL presence, and host allowlists.
+- Backward compatibility mode falls back to legacy Hunt env wiring if catalog is missing.
 
 Acceptance:
-- County onboarding is config-driven (no pipeline rewrites per new county).
-- Per-county failures degrade gracefully while other counties continue processing.
-- Digest reflects county diversity from enabled scraper coverage.
+- `LANDORAMA_SOURCE_CATALOG_PATH` resolves to a valid catalog in normal operation.
+- Invalid catalog rows fail fast with actionable errors.
+- Legacy fallback mode emits explicit warning diagnostics.
+
+### 9.2 Template Parser Layer
+Deliverables:
+- Introduce parser template registry (`csv_taxsale_v1`, `pdf_taxsale_v1`, `html_table_taxsale_v1` scaffold).
+- Refactor county scraper orchestration to route by parser template key instead of hardcoded county parser logic.
+- Preserve deterministic dedupe and provenance parser versioning.
+
+Acceptance:
+- Parser template tests cover CSV/PDF success and schema mismatch failure classification.
+- New counties can be added by catalog entries without pipeline rewrites.
+
+### 9.3 Multi-County Orchestration and Coverage Diagnostics
+Deliverables:
+- Execute enabled counties + sources in one scraper provider run.
+- Emit county-level diagnostics (records found/accepted/rejected and price summary stats).
+- Extend settings API with county coverage array and failure counts.
+
+Acceptance:
+- One county failure does not fail the whole run if others succeed.
+- All-county failure marks scraper provider as failed.
+- Runs/settings surfaces county coverage health clearly.
+
+### 9.4 Rollout Pack: Hunt + 5 Counties
+Deliverables:
+- Onboard catalog entries for Hunt, Collin, Delta, Fannin, Hopkins, and Rains.
+- Add fixture replay coverage for each rollout county.
+- Produce live validation evidence reports for rollout counties.
+
+Acceptance:
+- At least 4 of 6 rollout counties pass live validation with persisted artifacts.
+- Fixture validation enforces `accepted >= 1` per tested county.
+- Digest reflects multi-county inventory where available.
 
 ## Phase 10: Hardening and Release Candidate
 Deliverables:

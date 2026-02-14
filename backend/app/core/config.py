@@ -6,12 +6,16 @@ from pathlib import Path
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+BACKEND_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = BACKEND_ROOT.parent
+DATA_ROOT = REPO_ROOT / "data"
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="LANDORAMA_", extra="ignore")
 
     app_name: str = "Land-O-Rama API"
-    db_path: str = "/Users/bborn/land-o-rama/data/landorama.db"
+    db_path: str = str(DATA_ROOT / "landorama.db")
     cors_origins: str = "http://localhost:5173"
     default_state: str = "TX"
     refresh_time: str = "08:00"
@@ -19,13 +23,14 @@ class Settings(BaseSettings):
     mock_mode: bool = True
     price_cap: float = 6000.0
     auction_source_mode: str = "scraper"
-    auction_csv_dir: str = "/Users/bborn/land-o-rama/data/auction_feeds"
+    auction_csv_dir: str = str(DATA_ROOT / "auction_feeds")
     auction_csv_glob: str = "*.csv"
     auction_max_file_age_days: int = 14
     scraper_mode: str = "download_first"
     scraper_target_counties: str = "hunt"
+    source_catalog_path: str = str(BACKEND_ROOT / "config" / "county_sources.yaml")
     scraper_hunt_source_urls: str = ""
-    scraper_download_dir: str = "/Users/bborn/land-o-rama/data/scraper_downloads"
+    scraper_download_dir: str = str(DATA_ROOT / "scraper_downloads")
     scraper_allowed_hosts: str = ""
     scraper_request_interval_ms: int = 1000
     regrid_api_key: str | None = None
@@ -34,7 +39,7 @@ class Settings(BaseSettings):
     market_metrics_cache_lookback_days: int = 30
     personalization_threshold: int = 50
     personalization_blend_weight: float = 0.15
-    personalization_model_path: str = "/Users/bborn/land-o-rama/data/models/personalization_v1.joblib"
+    personalization_model_path: str = str(DATA_ROOT / "models" / "personalization_v1.joblib")
 
     @field_validator("default_state")
     @classmethod

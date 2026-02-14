@@ -100,11 +100,26 @@ export type SettingsResponse = {
   scraper_last_success_county: string | null;
   scraper_parse_error_count: number;
   scraper_last_records_accepted: number;
+  scraper_enabled_counties: string[];
+  scraper_county_coverage: ScraperCountyCoverage[];
+  scraper_county_failures: number;
   personalization_ready: boolean;
   feedback_labels_count: number;
   personalization_threshold: number;
   personalization_blend_weight: number;
   provider_health: ProviderEventStatus[];
+};
+
+export type ScraperCountyCoverage = {
+  county: string;
+  last_success_at: string | null;
+  records_found: number;
+  records_accepted: number;
+  records_rejected: number;
+  min_price: number | null;
+  median_price: number | null;
+  max_price: number | null;
+  status: string;
 };
 
 export type ProviderEventStatus = {

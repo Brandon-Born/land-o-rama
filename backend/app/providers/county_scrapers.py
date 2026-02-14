@@ -19,6 +19,9 @@ class ScrapeArtifact:
     records_found: int
     records_accepted: int
     records_rejected: int
+    price_min: float | None = None
+    price_median: float | None = None
+    price_max: float | None = None
 
 
 @dataclass(slots=True)
