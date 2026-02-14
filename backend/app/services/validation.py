@@ -69,7 +69,7 @@ def validate_hunt_pull(
 
     if mode == "fixture":
         fixture = fixture_path or _default_fixture_path()
-        fixture_download_dir = fixture.parent / "scraper_downloads"
+        fixture_download_dir = DEFAULT_REPORT_DIR / "scraper_downloads"
         os.environ.setdefault("LANDORAMA_DB_PATH", "/Users/bborn/projects/land-o-rama/data/landorama.db")
         os.environ["LANDORAMA_MOCK_MODE"] = "false"
         os.environ["LANDORAMA_AUCTION_SOURCE_MODE"] = "scraper"
