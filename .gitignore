@@ -26,6 +26,7 @@ data/*.db-*
 data/*.sqlite
 data/*.sqlite-*
 data/runs/
+data/validation/
 
 # IDE
 .idea/

@@ -463,3 +463,29 @@
   - Add live Hunt source fixture replay tests that validate `scrape_artifacts` against real downloaded snapshots.
   - Implement concrete Collin/Delta county adapters (currently registry stubs).
   - Add scraper preflight endpoint/CLI for validating source URLs and parser readiness before scheduled runs.
+
+## 2026-02-14 - Hunt County Pull Validation Workflow (Two-Tier)
+- Task summary:
+  - Implemented Hunt pull validation service and CLI with `fixture` and `live` modes.
+  - Added deterministic fixture-based validation coverage for success, parse drift, dedupe accounting, zero-accepted failure, and report writing.
+  - Added JSON validation evidence report output with run/provider/artifact diagnostics and effective settings snapshot.
+  - Added Makefile targets (`validate-hunt-fixture`, `validate-hunt-live`) and updated docs for operator workflow.
+- Files changed:
+  - `/Users/bborn/projects/land-o-rama/.gitignore`
+  - `/Users/bborn/projects/land-o-rama/backend/app/providers/hunt_county_scraper.py`
+  - `/Users/bborn/projects/land-o-rama/backend/app/services/validation.py`
+  - `/Users/bborn/projects/land-o-rama/backend/scripts/validate_hunt_pull.py`
+  - `/Users/bborn/projects/land-o-rama/backend/tests/fixtures/hunt/hunt_pull_valid_sample.csv`
+  - `/Users/bborn/projects/land-o-rama/backend/tests/test_hunt_pull_validation.py`
+  - `/Users/bborn/projects/land-o-rama/Makefile`
+  - `/Users/bborn/projects/land-o-rama/README.md`
+  - `/Users/bborn/projects/land-o-rama/docs/ARCHITECTURE.md`
+  - `/Users/bborn/projects/land-o-rama/docs/IMPLEMENTATION_BACKLOG.md`
+  - `/Users/bborn/projects/land-o-rama/docs/WORK_LOG.md`
+- Validation performed:
+  - `cd /Users/bborn/projects/land-o-rama/backend && LANDORAMA_DB_PATH=/Users/bborn/projects/land-o-rama/data/landorama.db .venv/bin/python -m pytest -q` passed.
+  - `cd /Users/bborn/projects/land-o-rama && make validate-hunt-fixture` passed and produced JSON report.
+- Next recommended tasks:
+  - Wire live Hunt validation into a scheduled operator check and retain report history for trend monitoring.
+  - Add fixture variants for future county adapters (Collin/Delta) as those parsers are implemented.
+  - Add optional API endpoint to expose latest Hunt validation report metadata in the runs/settings UI.

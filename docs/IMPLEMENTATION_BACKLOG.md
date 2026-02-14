@@ -77,17 +77,19 @@ Acceptance:
 - Runs/settings surfaces scraper diagnostics (attempted fetches, parse failures, coverage).
 - Empty/unavailable source triggers `degraded` with clear provider events, not silent failure.
 
-## Phase 7: Scraper Data Quality and Compliance Hardening (In Progress)
+## Phase 7: Scraper Data Quality and Compliance Hardening (Complete)
 Deliverables:
 - Scraper guardrails: request throttling, retry/backoff, and source allowlist checks.
 - Parser contract tests for schema drift handling and failure classification.
 - Local raw snapshot retention rules for reproducible parsing/audit.
 - Auction-specific normalization checks (parcel key quality, price/acres sanity bounds).
+- Two-tier Hunt pull validation workflow (fixture gate + live smoke check) with JSON evidence reports.
 
 Acceptance:
 - Source schema changes are detected and surfaced as actionable degraded errors.
 - Re-running the same snapshot produces deterministic normalized outputs.
 - Run logs include county-level scrape coverage and parse quality metrics.
+- Hunt validation passes when at least one Hunt record is accepted and artifacts are persisted.
 
 ## Phase 8: RapidAPI Deprecation and Removal (Complete)
 Deliverables:

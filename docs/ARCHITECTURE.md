@@ -57,6 +57,7 @@ Land-O-Rama is a local-first web application with:
 - Per-provider timeouts and retries with backoff.
 - Scraper fetch + parse stages emit per-source diagnostics (fetch failures, parse failures, schema mismatches).
 - Scraper parser versioning and provenance checks support deterministic reprocessing.
+- Hunt pull validation emits JSON evidence reports and cross-checks `sync_runs`, `provider_run_events`, and `scrape_artifacts`.
 - Partial-failure tolerance: mark run degraded but continue pipeline if possible.
 - Explicit run status table with timestamps, counts, and error summaries.
 - Idempotent daily run keyed by run date/source snapshot.

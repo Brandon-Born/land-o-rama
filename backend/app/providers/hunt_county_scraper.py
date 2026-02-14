@@ -46,7 +46,11 @@ class HuntCountyDownloadFirstScraper:
 
     def fetch(self, *, state: str, counties: list[str], max_price: float) -> CountyScrapeResult:
         target_counties = {county.strip().lower() for county in counties if county.strip()}
-        if "hunt county" not in target_counties and "hunt" not in target_counties:
+        hunt_enabled = any(
+            county == "hunt" or county.startswith("hunt county") or "hunt county" in county
+            for county in target_counties
+        )
+        if not hunt_enabled:
             return CountyScrapeResult(candidates=[], warnings=[], artifacts=[], attempted_sources=0, successful_sources=0)
 
         self.download_dir.mkdir(parents=True, exist_ok=True)

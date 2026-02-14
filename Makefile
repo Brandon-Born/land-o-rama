@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 PYTHON_BIN ?= /opt/homebrew/bin/python3.13
 
-.PHONY: backend-bootstrap frontend-bootstrap setup dev backend-install backend-dev frontend-install frontend-dev test test-api db-upgrade db-revision
+.PHONY: backend-bootstrap frontend-bootstrap setup dev backend-install backend-dev frontend-install frontend-dev test test-api db-upgrade db-revision validate-hunt-fixture validate-hunt-live
 
 backend-bootstrap:
 	cd backend && \
@@ -48,3 +48,9 @@ db-upgrade:
 
 db-revision:
 	cd backend && . .venv/bin/activate && alembic revision -m "$(MSG)"
+
+validate-hunt-fixture:
+	cd backend && .venv/bin/python scripts/validate_hunt_pull.py --mode fixture
+
+validate-hunt-live:
+	cd backend && .venv/bin/python scripts/validate_hunt_pull.py --mode live

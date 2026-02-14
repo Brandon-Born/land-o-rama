@@ -105,6 +105,21 @@ From `/Users/bborn/land-o-rama`:
 - `make db-upgrade`
 - `make db-revision MSG="your migration message"`
 
+## Hunt Pull Validation
+Two-tier validation workflow for Hunt County scraper ingestion:
+- Fixture validation (deterministic, CI-safe):
+  - `make validate-hunt-fixture`
+- Live validation (operational smoke check):
+  - `make validate-hunt-live`
+
+Direct script usage:
+- `cd backend && .venv/bin/python scripts/validate_hunt_pull.py --mode fixture`
+- `cd backend && .venv/bin/python scripts/validate_hunt_pull.py --mode live`
+
+Validation report output:
+- Default path: `/Users/bborn/projects/land-o-rama/data/validation/hunt_pull_<timestamp>.json`
+- Pass criteria: at least one accepted Hunt record, no scraper hard failure, and persisted Hunt scrape artifacts.
+
 ## Key API Endpoints
 - `GET /health`
 - `GET /api/v1/opportunities`
