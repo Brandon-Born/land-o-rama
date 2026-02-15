@@ -21,7 +21,8 @@ class Settings(BaseSettings):
     refresh_time: str = "08:00"
     personalization_retrain_time: str = "02:30"
     mock_mode: bool = True
-    price_cap: float = 6000.0
+    price_cap: float = 5000.0
+    ingestion_price_cap: float = 15000.0
     auction_source_mode: str = "scraper"
     auction_csv_dir: str = str(DATA_ROOT / "auction_feeds")
     auction_csv_glob: str = "*.csv"

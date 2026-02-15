@@ -19,6 +19,8 @@ class ScrapeArtifact:
     records_found: int
     records_accepted: int
     records_rejected: int
+    records_filtered_price: int = 0
+    rejection_reasons: dict[str, int] = field(default_factory=dict)
     price_min: float | None = None
     price_median: float | None = None
     price_max: float | None = None

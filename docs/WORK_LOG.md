@@ -587,3 +587,140 @@
   - Add and verify reachable public sources for Collin/Delta/Fannin/Hopkins/Rains to meet the `>=4/6` live validation threshold.
   - Improve parser coverage for non-Hunt county formats (including `html_table_taxsale_v1` implementation where needed).
   - Add a small operator runbook section for interpreting warning-pass days when `accepted=0` but `records_found>0`.
+
+## 2026-02-15 - Hunt Stabilization Pass (Price Semantics + Parser Fixtures + Yield Gate)
+- Task summary:
+  - Updated `pdf_taxsale_v1` to distinguish auction-entry price from market/appraised value and persist both in candidate payloads.
+  - Added Hunt PDF snapshot fixture coverage and parser tests for both market-value fallback and explicit minimum-bid extraction.
+  - Split live validation reporting into availability vs yield status and added streak-based yield gate failure after persistent zero-accepted live runs.
+- Files changed:
+  - `/Users/bborn/projects/land-o-rama/backend/app/providers/mock_data.py`
+  - `/Users/bborn/projects/land-o-rama/backend/app/providers/parser_templates.py`
+  - `/Users/bborn/projects/land-o-rama/backend/app/services/validation.py`
+  - `/Users/bborn/projects/land-o-rama/backend/tests/fixtures/hunt/hunt_pdf_snapshot_excerpt.txt`
+  - `/Users/bborn/projects/land-o-rama/backend/tests/test_parser_templates.py`
+  - `/Users/bborn/projects/land-o-rama/backend/tests/test_county_pull_validation.py`
+  - `/Users/bborn/projects/land-o-rama/backend/.env.example`
+  - `/Users/bborn/projects/land-o-rama/README.md`
+  - `/Users/bborn/projects/land-o-rama/docs/ARCHITECTURE.md`
+  - `/Users/bborn/projects/land-o-rama/docs/WORK_LOG.md`
+- Validation performed:
+  - `cd /Users/bborn/projects/land-o-rama/backend && LANDORAMA_DB_PATH=/Users/bborn/projects/land-o-rama/data/landorama.db .venv/bin/python -m pytest -q` passed (`45 passed`).
+  - `cd /Users/bborn/projects/land-o-rama/frontend && npm test -- --run` passed (`14 passed`).
+  - `cd /Users/bborn/projects/land-o-rama/backend && .venv/bin/python scripts/validate_county_pull.py --mode fixture --counties hunt --output /Users/bborn/projects/land-o-rama/data/validation/fixture_check_after_stabilization.json` passed.
+- Next recommended tasks:
+  - Add Hunt-side source alternatives that include explicit bid/opening price columns to reduce reliance on market-value fallback days.
+  - Surface `availability_status` and `yield_status` in runs/settings UI to make zero-accepted streaks actionable.
+  - Add operator runbook guidance for tuning `LANDORAMA_LIVE_YIELD_FAIL_STREAK` and `LANDORAMA_LIVE_YIELD_LOOKBACK_RUNS`.
+
+## 2026-02-15 - LGBS Source Discovery + Hunt Ingestion Wiring
+- Task summary:
+  - Documented source-discovery findings and source selection rationale for Hunt stabilization handoff.
+  - Added LGBS JSON ingestion support via new parser template (`lgbs_property_sales_v1`) with county filtering and minimum-bid/market-value fallback handling.
+  - Updated Hunt source catalog mesh to prioritize LGBS property-sales feed and retain PBFCM PDF fallback.
+  - Added fixture and integration tests for LGBS parser + template scraper execution.
+- Files changed:
+  - `/Users/bborn/projects/land-o-rama/backend/app/providers/source_catalog.py`
+  - `/Users/bborn/projects/land-o-rama/backend/app/providers/parser_templates.py`
+  - `/Users/bborn/projects/land-o-rama/backend/app/providers/hunt_county_scraper.py`
+  - `/Users/bborn/projects/land-o-rama/backend/config/county_sources.yaml`
+  - `/Users/bborn/projects/land-o-rama/backend/tests/test_source_catalog.py`
+  - `/Users/bborn/projects/land-o-rama/backend/tests/test_provider_pipeline.py`
+  - `/Users/bborn/projects/land-o-rama/backend/tests/test_parser_templates.py`
+  - `/Users/bborn/projects/land-o-rama/backend/tests/fixtures/hunt/lgbs_property_sales_sample.json`
+  - `/Users/bborn/projects/land-o-rama/docs/SOURCE_FINDINGS.md`
+  - `/Users/bborn/projects/land-o-rama/README.md`
+  - `/Users/bborn/projects/land-o-rama/docs/ARCHITECTURE.md`
+  - `/Users/bborn/projects/land-o-rama/docs/WORK_LOG.md`
+- Validation performed:
+  - `cd /Users/bborn/projects/land-o-rama/backend && LANDORAMA_DB_PATH=/Users/bborn/projects/land-o-rama/data/landorama.db .venv/bin/python -m pytest -q` passed (`47 passed`).
+  - `cd /Users/bborn/projects/land-o-rama/frontend && npm test -- --run` passed (`14 passed`).
+  - `cd /Users/bborn/projects/land-o-rama/backend && .venv/bin/python scripts/validate_county_pull.py --mode fixture --counties hunt --output /Users/bborn/projects/land-o-rama/data/validation/fixture_check_after_lgbs_ingestion.json` passed.
+- Next recommended tasks:
+  - Run live Hunt validation with network-enabled environment to verify LGBS endpoint reachability and observe accepted-row impact.
+  - Add parser telemetry for LGBS-specific rejection reasons (missing acreage, county mismatch, missing price fields).
+  - Add runs/settings UI display of per-source parser version and price-source mix (`auction_entry_price` vs `market_value_fallback`).
+
+## 2026-02-15 - Elevated Live Verification (LGBS Reachability + Hunt Live Run)
+- Task summary:
+  - Performed elevated-network verification of the live LGBS endpoint and confirmed JSON API reachability.
+  - Validated query parameters and updated Hunt LGBS source URL to enforce county/state filtering (`county=HUNT COUNTY`, `state=TX`).
+  - Normalized county-name matching in the LGBS parser (`HUNT COUNTY` -> `Hunt`) and added `account_nbr` parcel-key alias support.
+  - Re-ran live Hunt validation; source fetches succeeded but Hunt remained yield-failed due zero accepted rows.
+- Files changed:
+  - `/Users/bborn/projects/land-o-rama/backend/config/county_sources.yaml`
+  - `/Users/bborn/projects/land-o-rama/backend/app/providers/parser_templates.py`
+  - `/Users/bborn/projects/land-o-rama/docs/WORK_LOG.md`
+- Validation performed:
+  - Elevated curl/API probe for `https://taxsales.lgbs.com/api/property_sales/` returned `200 OK` with JSON payload.
+  - Elevated live validation:
+    - `cd /Users/bborn/projects/land-o-rama/backend && .venv/bin/python scripts/validate_county_pull.py --mode live --counties hunt --output /Users/bborn/projects/land-o-rama/data/validation/live_check_hunt_after_lgbs_filtered.json` failed as expected (`records_found=25`, `records_accepted=0`).
+  - Parser/catalog regression tests:
+    - `cd /Users/bborn/projects/land-o-rama/backend && LANDORAMA_DB_PATH=/Users/bborn/projects/land-o-rama/data/landorama.db .venv/bin/python -m pytest -q tests/test_parser_templates.py tests/test_provider_pipeline.py tests/test_source_catalog.py` passed (`19 passed`).
+- Next recommended tasks:
+  - Add LGBS rejection-reason telemetry to confirm dominant reject cause in-run (currently inferred as missing acreage on payload rows).
+  - Add Hunt acreage enrichment for LGBS rows (e.g., by `account_nbr` lookup) before score/filter stage.
+  - Consider temporary Hunt-specific fallback policy for missing acreage only if enrichment is unavailable and quality guardrails are defined.
+
+## 2026-02-15 - Hunt Stabilization Implementation (Acreage Enrichment + Two-Tier Caps)
+- Task summary:
+  - Added Hunt acreage enrichment path for LGBS rows by querying Hunt CAD `legal_acreage` using parcel/account identity when source acreage is missing.
+  - Implemented two-tier cap behavior: user-facing `price_cap` remains default `5000` while pipeline ingestion uses new `ingestion_price_cap` default `15000`.
+  - Updated settings/runtime contracts and runs UI diagnostics to surface both display and ingestion caps.
+  - Verified live Hunt validation passes end-to-end with the new behavior.
+- Files changed:
+  - `/Users/bborn/projects/land-o-rama/backend/app/core/config.py`
+  - `/Users/bborn/projects/land-o-rama/backend/app/services/pipeline.py`
+  - `/Users/bborn/projects/land-o-rama/backend/app/services/settings.py`
+  - `/Users/bborn/projects/land-o-rama/backend/app/services/validation.py`
+  - `/Users/bborn/projects/land-o-rama/backend/app/schemas/api.py`
+  - `/Users/bborn/projects/land-o-rama/backend/app/api/routes.py`
+  - `/Users/bborn/projects/land-o-rama/backend/app/providers/parser_templates.py`
+  - `/Users/bborn/projects/land-o-rama/backend/.env.example`
+  - `/Users/bborn/projects/land-o-rama/backend/tests/test_parser_templates.py`
+  - `/Users/bborn/projects/land-o-rama/backend/tests/test_hunt_pull_validation.py`
+  - `/Users/bborn/projects/land-o-rama/backend/tests/test_county_pull_validation.py`
+  - `/Users/bborn/projects/land-o-rama/frontend/src/types.ts`
+  - `/Users/bborn/projects/land-o-rama/frontend/src/App.tsx`
+  - `/Users/bborn/projects/land-o-rama/frontend/src/App.test.tsx`
+  - `/Users/bborn/projects/land-o-rama/README.md`
+  - `/Users/bborn/projects/land-o-rama/docs/API_SPEC.md`
+  - `/Users/bborn/projects/land-o-rama/docs/ARCHITECTURE.md`
+  - `/Users/bborn/projects/land-o-rama/docs/SOURCE_FINDINGS.md`
+  - `/Users/bborn/projects/land-o-rama/docs/WORK_LOG.md`
+- Validation performed:
+  - `cd /Users/bborn/projects/land-o-rama/backend && LANDORAMA_DB_PATH=/Users/bborn/projects/land-o-rama/data/landorama.db .venv/bin/python -m pytest -q` passed (`48 passed`).
+  - `cd /Users/bborn/projects/land-o-rama/frontend && npm test -- --run` passed (`14 passed`).
+  - Elevated live validation:
+    - `cd /Users/bborn/projects/land-o-rama/backend && .venv/bin/python scripts/validate_county_pull.py --mode live --counties hunt --output /Users/bborn/projects/land-o-rama/data/validation/live_check_hunt_after_two_tier_enrichment.json` passed (`records_accepted=2`).
+  - Elevated direct scraper probe:
+    - `TemplateCountyDownloadFirstScraper` for Hunt reported `attempted=2`, `successful=1`; LGBS source returned intermittent `500 Internal Server Error`, PBFCM fallback produced accepted rows.
+- Next recommended tasks:
+  - Add explicit rejection-reason counters per source in scraper artifacts/provider events to keep Hunt troubleshooting deterministic.
+  - Expose yield streak status directly in frontend runs panel for operator visibility.
+  - Validate if additional Hunt counties/sale types from LGBS should be constrained by status/date filters to reduce non-actionable records.
+
+## 2026-02-15 - Parser/Scraper Refactor Pass (Registry + Enrichment Boundary + Outcome Counters)
+- Task summary:
+  - Extracted Hunt CAD acreage network lookup into a dedicated provider utility and switched LGBS parsing to injected resolver mode.
+  - Centralized parser template key ownership/inference into a shared parser registry and removed duplicated key logic across source catalog and scraper paths.
+  - Extended parser/scrape outcomes with explicit `records_filtered_price` and rejection-reason counters, and propagated those into per-source scrape artifacts.
+- Files changed:
+  - `/Users/bborn/projects/land-o-rama/backend/app/providers/parser_registry.py`
+  - `/Users/bborn/projects/land-o-rama/backend/app/providers/acreage_enrichment.py`
+  - `/Users/bborn/projects/land-o-rama/backend/app/providers/parser_templates.py`
+  - `/Users/bborn/projects/land-o-rama/backend/app/providers/hunt_county_scraper.py`
+  - `/Users/bborn/projects/land-o-rama/backend/app/providers/source_catalog.py`
+  - `/Users/bborn/projects/land-o-rama/backend/app/providers/county_scrapers.py`
+  - `/Users/bborn/projects/land-o-rama/backend/app/providers/__init__.py`
+  - `/Users/bborn/projects/land-o-rama/backend/tests/test_parser_templates.py`
+  - `/Users/bborn/projects/land-o-rama/backend/tests/test_provider_pipeline.py`
+  - `/Users/bborn/projects/land-o-rama/backend/tests/test_source_catalog.py`
+  - `/Users/bborn/projects/land-o-rama/docs/WORK_LOG.md`
+- Validation performed:
+  - `cd /Users/bborn/projects/land-o-rama/backend && LANDORAMA_DB_PATH=/Users/bborn/projects/land-o-rama/data/landorama.db .venv/bin/python -m pytest -q` passed (`49 passed`).
+  - `cd /Users/bborn/projects/land-o-rama/frontend && npm test -- --run` passed (`14 passed`).
+- Next recommended tasks:
+  - Persist `records_filtered_price` and rejection-reason counters in DB models/reporting so historical validation can distinguish parse rejects vs cap filtering.
+  - Surface source-level outcome breakdowns in runs/settings UI for faster operator triage.
+  - Add provider-event summaries that include per-source rejection-reason distributions during live runs.

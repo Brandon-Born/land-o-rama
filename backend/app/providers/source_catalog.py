@@ -2,13 +2,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal
 
 import yaml
 
 from app.core.config import Settings
-
-ParserTemplateKey = Literal["csv_taxsale_v1", "pdf_taxsale_v1", "html_table_taxsale_v1"]
+from app.providers.parser_registry import (
+    ParserTemplateKey,
+    infer_parser_template_from_url,
+    is_supported_parser_template_key,
+)
 
 
 @dataclass(slots=True)
@@ -67,7 +69,7 @@ def load_source_catalog(path: Path) -> list[SourceCatalogEntry]:
                 raise ValueError(
                     f"Invalid source in '{label}' #{source_index}: url and parser_template_key are required."
                 )
-            if parser_template_key not in {"csv_taxsale_v1", "pdf_taxsale_v1", "html_table_taxsale_v1"}:
+            if not is_supported_parser_template_key(parser_template_key):
                 raise ValueError(
                     f"Invalid parser_template_key '{parser_template_key}' in '{label}' #{source_index}."
                 )
@@ -84,7 +86,7 @@ def load_source_catalog(path: Path) -> list[SourceCatalogEntry]:
             sources.append(
                 CountySourceBinding(
                     source_url=source_url,
-                    parser_template_key=parser_template_key,  # type: ignore[arg-type]
+                    parser_template_key=parser_template_key,
                     allowed_hosts=allowed_hosts,
                     priority=priority,
                     source_name=source_name,
@@ -111,7 +113,7 @@ def load_source_catalog_with_fallback(settings: Settings) -> LoadedSourceCatalog
     legacy_sources = [
         CountySourceBinding(
             source_url=url,
-            parser_template_key="pdf_taxsale_v1" if url.lower().endswith(".pdf") else "csv_taxsale_v1",
+            parser_template_key=infer_parser_template_from_url(url),
             allowed_hosts=settings.scraper_allowed_host_list,
             priority=100,
             source_name="Legacy Hunt Source",

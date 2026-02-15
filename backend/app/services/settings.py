@@ -83,6 +83,7 @@ def read_settings(db: Session) -> SettingsResponse:
         disclaimers_enabled=values.get("disclaimers_enabled", "true") == "true",
         regrid_configured=bool(runtime.regrid_api_key),
         price_cap=runtime.price_cap,
+        ingestion_price_cap=runtime.ingestion_price_cap,
         auction_source_mode=runtime.auction_source_mode,
         auction_csv_dir=runtime.auction_csv_dir,
         auction_csv_glob=runtime.auction_csv_glob,

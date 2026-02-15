@@ -4,7 +4,8 @@ from app.providers.county_scrapers import CountyScrapeResult, CountyAuctionScrap
 from app.providers.enrichment import ParcelEnrichmentProvider, build_enrichment_provider
 from app.providers.health import ProviderHealthStatus
 from app.providers.metrics import MarketMetricsProvider, build_market_metrics_provider
-from app.providers.source_catalog import CountySourceBinding, ParserTemplateKey, SourceCatalogEntry
+from app.providers.parser_registry import ParserTemplateKey
+from app.providers.source_catalog import CountySourceBinding, SourceCatalogEntry
 
 __all__ = [
     "AuctionProvider",

@@ -40,7 +40,7 @@ def run_daily_pipeline(
 ) -> SyncRun:
     settings = read_settings(db)
     runtime = get_settings()
-    price_cap = runtime.price_cap
+    ingestion_price_cap = runtime.ingestion_price_cap
     run = SyncRun(run_type="daily", status="running")
     db.add(run)
     db.commit()
@@ -95,7 +95,7 @@ def run_daily_pipeline(
             auction_candidates, auctions_error, auctions_warning = _fetch_live_auctions(
                 live_auction_provider,
                 state=settings.state,
-                max_price=price_cap,
+                max_price=ingestion_price_cap,
             )
             scrape_artifacts = getattr(live_auction_provider, "last_artifacts", [])
             if scrape_artifacts:
@@ -236,8 +236,8 @@ def run_daily_pipeline(
 
         counties_using_fallback_metric: set[str] = set()
         for candidate in candidates:
-            if candidate.price > price_cap:
-                # Guardrail: enforce configured max listing price even if a provider sends out-of-policy data.
+            if candidate.price > ingestion_price_cap:
+                # Guardrail: enforce ingestion max price even if a provider sends out-of-policy data.
                 continue
             scored_count += 1
             parcel = _upsert_parcel(db, candidate)

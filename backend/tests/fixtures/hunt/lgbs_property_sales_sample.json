@@ -1,0 +1,52 @@
+{
+  "count": 4,
+  "results": [
+    {
+      "uid": "HUNT-1001",
+      "county": "HUNT COUNTY",
+      "state": "TX",
+      "parcel_id": "HUNT-P-1001",
+      "minimum_bid": "2450.00",
+      "market_value": "18000.00",
+      "acreage": "0.25",
+      "latitude": 33.1384,
+      "longitude": -96.1108,
+      "sale_type": "RESALE",
+      "detail_url": "https://taxsales.lgbs.com/property/HUNT-1001"
+    },
+    {
+      "uid": "HUNT-1002",
+      "county": "HUNT COUNTY",
+      "state": "TX",
+      "parcel_id": "HUNT-P-1002",
+      "minimum_bid": null,
+      "market_value": "4800.00",
+      "acreage": "0.40",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-96.1312, 33.1479]
+      },
+      "sale_type": "STRUCK OFF",
+      "detail_url": "https://taxsales.lgbs.com/property/HUNT-1002"
+    },
+    {
+      "uid": "COLLIN-2001",
+      "county": "Collin",
+      "state": "TX",
+      "parcel_id": "COL-P-2001",
+      "minimum_bid": "1200.00",
+      "market_value": "10000.00",
+      "acreage": "0.30"
+    },
+    {
+      "uid": "HUNT-1003",
+      "county": "Hunt",
+      "state": "TX",
+      "parcel_id": "HUNT-P-1003",
+      "minimum_bid": "7200.00",
+      "market_value": "22000.00",
+      "acreage": "0.50",
+      "sale_type": "SALE"
+    }
+  ]
+}

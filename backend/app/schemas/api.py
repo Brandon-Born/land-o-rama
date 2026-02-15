@@ -127,7 +127,8 @@ class SettingsResponse(BaseModel):
     mock_mode: bool
     disclaimers_enabled: bool = Field(default=True)
     regrid_configured: bool = False
-    price_cap: float = 6000.0
+    price_cap: float = 5000.0
+    ingestion_price_cap: float = 15000.0
     auction_source_mode: str = "mock"
     auction_csv_dir: str = "/Users/bborn/land-o-rama/data/auction_feeds"
     auction_csv_glob: str = "*.csv"

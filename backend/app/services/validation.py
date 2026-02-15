@@ -10,12 +10,12 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Callable, Literal
 
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, desc, func, select
 from sqlalchemy.orm import Session, sessionmaker
 import yaml
 
 from app.core.config import get_settings
-from app.models import ConfigKV, ProviderRunEvent, ScrapeArtifact
+from app.models import ConfigKV, ProviderRunEvent, ScrapeArtifact, SyncRun
 from app.providers.county_registry import build_county_registry
 from app.services.pipeline import run_daily_pipeline
 
@@ -34,6 +34,9 @@ class ValidationEffectiveSettings:
     scraper_target_counties: list[str]
     scraper_mode: str
     price_cap: float
+    ingestion_price_cap: float
+    live_yield_fail_streak: int
+    live_yield_lookback_runs: int
 
 
 @dataclass(slots=True)
@@ -46,6 +49,9 @@ class CountyValidationStatus:
     records_rejected: int
     provider_status: str
     status: str
+    availability_status: str
+    yield_status: str
+    yield_zero_accepted_streak: int
     min_price: float | None
     median_price: float | None
     max_price: float | None
@@ -135,6 +141,11 @@ def validate_county_pull(
             runtime = get_settings()
             registry = [entry for entry in build_county_registry(runtime) if entry.enabled]
             source_urls_checked = [source.source_url for entry in registry for source in entry.sources]
+            live_yield_fail_streak = max(1, int(os.getenv("LANDORAMA_LIVE_YIELD_FAIL_STREAK", "3")))
+            live_yield_lookback_runs = max(
+                live_yield_fail_streak,
+                int(os.getenv("LANDORAMA_LIVE_YIELD_LOOKBACK_RUNS", "7")),
+            )
 
             failure_reasons: list[str] = []
             warning_samples: list[str] = []
@@ -189,6 +200,7 @@ def validate_county_pull(
                             if event.error_summary and len(warning_samples) < 5:
                                 warning_samples.append(event.error_summary)
 
+                        live_yield_failures: list[str] = []
                         for entry in registry:
                             artifacts = db.scalars(
                                 select(ScrapeArtifact).where(
@@ -204,24 +216,42 @@ def validate_county_pull(
                             maxes = [artifact.price_max for artifact in artifacts if artifact.price_max is not None]
                             source_attempted = len(entry.sources)
                             source_successful = len(artifacts)
-                            county_status = "success"
-                            provider_status = "success"
+                            availability_status = "success"
+                            yield_status = "success"
+                            yield_zero_accepted_streak = 0
                             if source_attempted > 0 and source_successful == 0:
-                                county_status = "failed"
-                                provider_status = "failed"
+                                availability_status = "failed"
                             elif mode == "fixture" and accepted < 1:
-                                county_status = "failed"
-                                provider_status = "failed"
+                                yield_status = "failed"
                             elif mode == "live" and found < 1:
-                                county_status = "failed"
-                                provider_status = "failed"
+                                availability_status = "failed"
                             elif mode == "live" and accepted < 1:
-                                county_status = "warning"
-                                provider_status = "warning"
+                                yield_status = "warning"
                                 if len(warning_samples) < 5:
                                     warning_samples.append(
                                         f"{entry.county}: parsed rows were found, but none were accepted after filters."
                                     )
+                                yield_zero_accepted_streak = _compute_live_zero_accepted_streak(
+                                    db,
+                                    county=entry.county,
+                                    source_urls=[source.source_url for source in entry.sources],
+                                    lookback_runs=live_yield_lookback_runs,
+                                )
+                                if yield_zero_accepted_streak >= live_yield_fail_streak:
+                                    yield_status = "failed"
+                                    live_yield_failures.append(
+                                        (
+                                            f"{entry.county}: zero accepted rows persisted for "
+                                            f"{yield_zero_accepted_streak} consecutive live runs."
+                                        )
+                                    )
+
+                            county_status = "success"
+                            if availability_status == "failed" or yield_status == "failed":
+                                county_status = "failed"
+                            elif availability_status == "warning" or yield_status == "warning":
+                                county_status = "warning"
+                            provider_status = county_status
 
                             county_statuses.append(
                                 CountyValidationStatus(
@@ -233,6 +263,9 @@ def validate_county_pull(
                                     records_rejected=rejected,
                                     provider_status=provider_status,
                                     status=county_status,
+                                    availability_status=availability_status,
+                                    yield_status=yield_status,
+                                    yield_zero_accepted_streak=yield_zero_accepted_streak,
                                     min_price=min(mins) if mins else None,
                                     median_price=(sum(medians) / len(medians)) if medians else None,
                                     max_price=max(maxes) if maxes else None,
@@ -249,6 +282,10 @@ def validate_county_pull(
                         failed_counties = [item.county for item in county_statuses if item.status == "failed"]
                         if failed_counties:
                             failure_reasons.append("County validation failed for: " + ", ".join(sorted(failed_counties)))
+                        if live_yield_failures:
+                            failure_reasons.append(
+                                "Live yield gate failed: " + "; ".join(sorted(live_yield_failures))
+                            )
                         if mode == "live":
                             passing = [item for item in county_statuses if item.status in {"success", "warning"}]
                             required = min(4, len(county_statuses))
@@ -280,6 +317,9 @@ def validate_county_pull(
                     scraper_target_counties=runtime.scraper_target_county_list,
                     scraper_mode=runtime.scraper_mode,
                     price_cap=runtime.price_cap,
+                    ingestion_price_cap=runtime.ingestion_price_cap,
+                    live_yield_fail_streak=live_yield_fail_streak,
+                    live_yield_lookback_runs=live_yield_lookback_runs,
                 ),
             )
             report_path = output_path or _default_output_path(prefix="county_pull")
@@ -402,6 +442,45 @@ def _write_fixture_catalog(counties: list[str], fixture_path: Path) -> Path:
     with NamedTemporaryFile("w", encoding="utf-8", suffix=".yaml", delete=False) as handle:
         yaml.safe_dump(payload, handle, sort_keys=False)
         return Path(handle.name)
+
+
+def _compute_live_zero_accepted_streak(
+    db: Session,
+    *,
+    county: str,
+    source_urls: list[str],
+    lookback_runs: int,
+) -> int:
+    normalized_sources = [url for url in source_urls if url]
+    if lookback_runs <= 0 or not normalized_sources:
+        return 0
+
+    rows = db.execute(
+        select(
+            SyncRun.id,
+            func.sum(ScrapeArtifact.records_found).label("records_found"),
+            func.sum(ScrapeArtifact.records_accepted).label("records_accepted"),
+        )
+        .join(ScrapeArtifact, ScrapeArtifact.run_id == SyncRun.id)
+        .where(
+            ScrapeArtifact.county == county,
+            ScrapeArtifact.source_url.in_(normalized_sources),
+            SyncRun.status.in_(["success", "degraded"]),
+        )
+        .group_by(SyncRun.id, SyncRun.started_at)
+        .order_by(desc(SyncRun.started_at))
+        .limit(lookback_runs)
+    ).all()
+
+    streak = 0
+    for _, records_found, records_accepted in rows:
+        found = int(records_found or 0)
+        accepted = int(records_accepted or 0)
+        if found > 0 and accepted < 1:
+            streak += 1
+        else:
+            break
+    return streak
 
 
 def _run_migrations() -> None:

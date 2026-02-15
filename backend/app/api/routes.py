@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models import Digest, FeatureVector, Feedback, Opportunity, ProviderRunEvent, SyncRun
+from app.core.config import get_settings as get_runtime_settings
 from app.schemas.api import (
     DigestSummary,
     DigestsResponse,
@@ -33,16 +34,17 @@ router = APIRouter(prefix="/api/v1", tags=["v1"])
 @router.get("/opportunities", response_model=OpportunityListResponse)
 def list_opportunities(
     min_score: float | None = Query(default=None),
-    max_price: float = Query(default=5000.0),
+    max_price: float | None = Query(default=None),
     county: str | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=25, ge=1, le=100),
     db: Session = Depends(get_db),
 ) -> OpportunityListResponse:
+    effective_max_price = max_price if max_price is not None else get_runtime_settings().price_cap
     run_id = latest_successful_run_id(db)
     base_stmt = select(Opportunity).where(
         Opportunity.is_excluded.is_(False),
-        Opportunity.price <= max_price,
+        Opportunity.price <= effective_max_price,
     )
     if run_id:
         base_stmt = base_stmt.where(Opportunity.run_id == run_id)

@@ -601,6 +601,16 @@ export default function App() {
                   </span>
                   <span>Regrid: {settings?.regrid_configured ? "Configured" : "Missing Key"}</span>
                   <span>Auction Source: {settings?.auction_source_mode ?? "n/a"}</span>
+                  <span>
+                    Display Cap:{" "}
+                    {settings && Number.isFinite(settings.price_cap) ? currency(settings.price_cap) : "n/a"}
+                  </span>
+                  <span>
+                    Ingestion Cap:{" "}
+                    {settings && Number.isFinite(settings.ingestion_price_cap)
+                      ? currency(settings.ingestion_price_cap)
+                      : "n/a"}
+                  </span>
                   <span>CSV Dir: {settings?.auction_csv_dir ?? "n/a"}</span>
                   <span>CSV Glob: {settings?.auction_csv_glob ?? "n/a"}</span>
                   <span>CSV Age Days: {settings?.auction_max_file_age_days ?? 0}</span>

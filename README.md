@@ -98,8 +98,12 @@ Common aliases are accepted (`id`, `apn`, `winning_bid`, `acres`, `lat`, `lon`, 
 - Set `LANDORAMA_AUCTION_SOURCE_MODE=scraper`.
 - Set `LANDORAMA_SCRAPER_TARGET_COUNTIES` to one or more counties (comma-separated).
 - Set `LANDORAMA_SOURCE_CATALOG_PATH` to your county source catalog (default `backend/config/county_sources.yaml`).
-- Parser templates now route by source binding (`csv_taxsale_v1`, `pdf_taxsale_v1`, `html_table_taxsale_v1` scaffold).
+- Parser templates now route by source binding (`csv_taxsale_v1`, `pdf_taxsale_v1`, `lgbs_property_sales_v1`, `html_table_taxsale_v1` scaffold).
 - Recommended public-source mesh uses county/public resale publishers (no RapidAPI dependency).
+- Hunt default source mesh now prefers LGBS property-sales JSON and keeps PBFCM resale PDF as fallback.
+- Two-tier pricing controls:
+  - `LANDORAMA_INGESTION_PRICE_CAP` controls pipeline acceptance ceiling (default `15000`).
+  - `LANDORAMA_PRICE_CAP` remains the user-facing dashboard default cap (`5000`).
 - Runtime behavior: no-new-data days are marked `degraded` and prior successful opportunities remain the active dashboard data source.
 
 ## Database Migrations
@@ -132,6 +136,7 @@ Validation report output:
 - Fixture pass criteria: at least one accepted Hunt record, no scraper hard failure, and persisted Hunt scrape artifacts.
 - Live pass criteria: at least one parsed Hunt record with persisted Hunt scrape artifacts and no scraper hard failure.
 - Live runs with parsed rows but zero accepted rows are warning-pass (strict mode converts warnings to failure).
+- Live yield gate: warning-pass converts to failure when zero accepted rows persist across consecutive live runs (`LANDORAMA_LIVE_YIELD_FAIL_STREAK`, default `3`).
 
 ## Key API Endpoints
 - `GET /health`
@@ -152,3 +157,4 @@ Validation report output:
 - `/Users/bborn/land-o-rama/docs/SCORING_SPEC.md`: Ranking algorithm and exclusion rules.
 - `/Users/bborn/land-o-rama/docs/API_SPEC.md`: Backend API contracts.
 - `/Users/bborn/land-o-rama/docs/IMPLEMENTATION_BACKLOG.md`: Ordered build phases and tasks.
+- `/Users/bborn/land-o-rama/docs/SOURCE_FINDINGS.md`: Source evaluation notes and ingestion decisions.

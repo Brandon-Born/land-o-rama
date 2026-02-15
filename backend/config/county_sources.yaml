@@ -4,6 +4,11 @@ counties:
     county: Hunt
     state: TX
     sources:
+      - url: https://taxsales.lgbs.com/api/property_sales/?ordering=sale_date,address_full,uid&sale_type=SALE,RESALE,STRUCK%20OFF,FUTURE%20SALE&state=TX&county=HUNT%20COUNTY
+        parser_template_key: lgbs_property_sales_v1
+        allowed_hosts: [taxsales.lgbs.com]
+        priority: 5
+        source_name: LGBS Property Sales API
       - url: https://www.pbfcm.com/docs/taxdocs/resales/huntcountytaxresale.pdf
         parser_template_key: pdf_taxsale_v1
         allowed_hosts: [www.pbfcm.com]

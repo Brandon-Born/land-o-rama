@@ -9,9 +9,11 @@ from urllib.parse import urlparse
 
 import httpx
 
+from app.providers.acreage_enrichment import build_hunt_cad_acreage_resolver
 from app.providers.county_scrapers import CountyScrapeResult, ScrapeArtifact, utcnow
+from app.providers.parser_registry import ParserTemplateKey, infer_parser_template_from_url
 from app.providers.parser_templates import get_parser_template
-from app.providers.source_catalog import CountySourceBinding, ParserTemplateKey
+from app.providers.source_catalog import CountySourceBinding
 
 
 @dataclass(slots=True)
@@ -33,6 +35,10 @@ class TemplateCountyDownloadFirstScraper:
         artifacts: list[ScrapeArtifact] = []
         candidates = []
         seen_keys: set[tuple[str, str, str]] = set()
+        county_is_hunt = self.county.strip().lower() == "hunt"
+        hunt_acreage_resolver = (
+            build_hunt_cad_acreage_resolver(timeout_seconds=self.timeout_seconds) if county_is_hunt else None
+        )
 
         for binding in sorted(self.source_bindings, key=lambda item: item.priority):
             attempted_sources += 1
@@ -42,7 +48,10 @@ class TemplateCountyDownloadFirstScraper:
                     source_url=source_url,
                     allowed_hosts=set(binding.allowed_hosts) if binding.allowed_hosts else self.default_allowed_hosts,
                 )
-                parser = get_parser_template(binding.parser_template_key)
+                parser = get_parser_template(
+                    binding.parser_template_key,
+                    hunt_acreage_resolver=hunt_acreage_resolver,
+                )
                 parsed = parser.parse(
                     file_path=local_path,
                     county=self.county,
@@ -54,6 +63,7 @@ class TemplateCountyDownloadFirstScraper:
 
                 accepted = 0
                 dedupe_rejected = 0
+                reject_breakdown = dict(parsed.rejection_reasons)
                 for candidate in parsed.candidates:
                     dedupe_key = (candidate.state, candidate.parcel_key, candidate.external_id)
                     if dedupe_key in seen_keys:
@@ -62,6 +72,8 @@ class TemplateCountyDownloadFirstScraper:
                     seen_keys.add(dedupe_key)
                     candidates.append(candidate)
                     accepted += 1
+                if dedupe_rejected > 0:
+                    reject_breakdown["dedupe_duplicate"] = reject_breakdown.get("dedupe_duplicate", 0) + dedupe_rejected
 
                 checksum = _sha256(local_path.read_bytes())
                 parsed_prices = parsed.parsed_prices
@@ -76,7 +88,9 @@ class TemplateCountyDownloadFirstScraper:
                         checksum_sha256=checksum,
                         records_found=parsed.records_found,
                         records_accepted=accepted,
-                        records_rejected=parsed.records_rejected + dedupe_rejected,
+                        records_rejected=parsed.records_rejected + parsed.records_filtered_price + dedupe_rejected,
+                        records_filtered_price=parsed.records_filtered_price,
+                        rejection_reasons=reject_breakdown,
                         price_min=min(parsed_prices) if parsed_prices else None,
                         price_median=float(median(parsed_prices)) if parsed_prices else None,
                         price_max=max(parsed_prices) if parsed_prices else None,
@@ -165,12 +179,7 @@ class HuntCountyDownloadFirstScraper:
 
 
 def _infer_template(source_url: str) -> ParserTemplateKey:
-    suffix = Path(urlparse(source_url).path).suffix.lower()
-    if suffix == ".pdf":
-        return "pdf_taxsale_v1"
-    if suffix == ".csv":
-        return "csv_taxsale_v1"
-    return "html_table_taxsale_v1"
+    return infer_parser_template_from_url(source_url)
 
 
 def _sha256(payload: bytes) -> str:

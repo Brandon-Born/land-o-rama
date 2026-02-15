@@ -86,6 +86,7 @@ export type SettingsResponse = {
   disclaimers_enabled: boolean;
   regrid_configured: boolean;
   price_cap: number;
+  ingestion_price_cap: number;
   auction_source_mode: string;
   auction_csv_dir: string;
   auction_csv_glob: string;

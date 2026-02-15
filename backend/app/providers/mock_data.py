@@ -26,6 +26,9 @@ class CandidateRecord:
     price_per_acre: float
     source_name: str | None = None
     source_url: str | None = None
+    auction_entry_price: float | None = None
+    observed_market_value: float | None = None
+    price_source: str | None = None
 
 
 @dataclass(slots=True)

@@ -84,7 +84,7 @@ def test_hunt_pull_validation_fixture_duplicates_accounted(session_factory, tmp_
     assert report.hunt_records_rejected >= 1
 
 
-def test_hunt_pull_validation_fixture_zero_accepted_fails(session_factory, tmp_path) -> None:
+def test_hunt_pull_validation_fixture_zero_accepted_fails(session_factory, tmp_path, monkeypatch) -> None:
     fixture = tmp_path / "hunt_price_cap_fail.csv"
     _write_csv(
         fixture,
@@ -93,6 +93,8 @@ def test_hunt_pull_validation_fixture_zero_accepted_fails(session_factory, tmp_p
             "H-1,PK-1,Hunt,TX,7000,0.2,https://example.test/auctions/H-1",
         ],
     )
+
+    monkeypatch.setenv("LANDORAMA_INGESTION_PRICE_CAP", "6000")
 
     report = validate_hunt_pull(
         mode="fixture",
@@ -148,6 +150,7 @@ def test_hunt_pull_validation_live_passes_when_rows_parsed_but_filtered(session_
     monkeypatch.setenv("LANDORAMA_SCRAPER_ALLOWED_HOSTS", "")
     monkeypatch.setenv("LANDORAMA_SCRAPER_REQUEST_INTERVAL_MS", "0")
     monkeypatch.setenv("LANDORAMA_SCRAPER_MODE", "download_first")
+    monkeypatch.setenv("LANDORAMA_INGESTION_PRICE_CAP", "6000")
 
     with session_factory() as db:
         ensure_default_settings(db)
@@ -184,6 +187,7 @@ def test_hunt_pull_validation_live_strict_fails_on_filter_warning(session_factor
     monkeypatch.setenv("LANDORAMA_SCRAPER_ALLOWED_HOSTS", "")
     monkeypatch.setenv("LANDORAMA_SCRAPER_REQUEST_INTERVAL_MS", "0")
     monkeypatch.setenv("LANDORAMA_SCRAPER_MODE", "download_first")
+    monkeypatch.setenv("LANDORAMA_INGESTION_PRICE_CAP", "6000")
 
     with session_factory() as db:
         ensure_default_settings(db)

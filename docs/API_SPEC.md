@@ -74,7 +74,8 @@ Returns non-secret runtime settings and provider health.
 
 Provider settings/health fields:
 - `regrid_configured: boolean`
-- `price_cap: number`
+- `price_cap: number` (user-facing default opportunity cap; default `5000`)
+- `ingestion_price_cap: number` (pipeline ingestion cap; default `15000`)
 - `auction_source_mode: string`
 - `auction_csv_dir: string`
 - `auction_csv_glob: string`

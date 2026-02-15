@@ -11,8 +11,9 @@ from app.models import ConfigKV, MarketMetricDaily, ProviderRunEvent
 from app.providers.auctions import AuctionFetchStats, CsvAuctionProvider, ScraperAuctionProvider
 from app.providers.county_registry import build_county_registry
 from app.providers.county_scrapers import CountyScrapeResult
-from app.providers.hunt_county_scraper import HuntCountyDownloadFirstScraper
+from app.providers.hunt_county_scraper import HuntCountyDownloadFirstScraper, TemplateCountyDownloadFirstScraper
 from app.providers.mock_data import CandidateRecord, CountyMetric
+from app.providers.source_catalog import CountySourceBinding
 from app.services.pipeline import run_daily_pipeline
 from app.services.settings import ensure_default_settings
 
@@ -300,7 +301,10 @@ def test_hunt_scraper_download_first_parses_pdf_and_filters(tmp_path, monkeypatc
     assert result.artifacts[0].parser_version == "pdf_taxsale_v1"
     assert result.artifacts[0].records_found == 3
     assert result.artifacts[0].records_accepted == 1
-    assert result.artifacts[0].records_rejected == 1
+    assert result.artifacts[0].records_filtered_price == 1
+    assert result.artifacts[0].records_rejected == 2
+    assert result.artifacts[0].rejection_reasons["price_cap"] == 1
+    assert result.artifacts[0].rejection_reasons["dedupe_duplicate"] == 1
 
 
 def test_hunt_scraper_template_mismatch_reports_warning(tmp_path) -> None:
@@ -318,7 +322,49 @@ def test_hunt_scraper_template_mismatch_reports_warning(tmp_path) -> None:
     assert result.attempted_sources == 1
     assert result.successful_sources == 0
     assert not result.artifacts
-    assert any("not implemented" in warning for warning in result.warnings)
+
+
+def test_template_scraper_parses_lgbs_json_fixture(tmp_path) -> None:
+    source_json = tmp_path / "lgbs_sample.json"
+    source_json.write_text(
+        "\n".join(
+            [
+                "{",
+                '  "results": [',
+                '    {"uid": "H-501", "county": "Hunt", "state": "TX", "parcel_id": "PK-501", "minimum_bid": "1900", "market_value": "9000", "acreage": "0.2"},',
+                '    {"uid": "H-502", "county": "Hunt", "state": "TX", "parcel_id": "PK-502", "minimum_bid": "8100", "market_value": "12000", "acreage": "0.3"}',
+                "  ]",
+                "}",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    scraper = TemplateCountyDownloadFirstScraper(
+        county="Hunt",
+        state="TX",
+        source_bindings=[
+            CountySourceBinding(
+                source_url=str(source_json),
+                parser_template_key="lgbs_property_sales_v1",
+                allowed_hosts=[],
+                priority=10,
+                source_name="LGBS Fixture",
+            )
+        ],
+        download_dir=tmp_path / "downloads",
+        timeout_seconds=1.0,
+        request_interval_ms=0,
+        default_allowed_hosts=set(),
+        provider_name="county_auction_scraper",
+    )
+
+    result = scraper.fetch(max_price=5000)
+    assert result.attempted_sources == 1
+    assert result.successful_sources == 1
+    assert len(result.candidates) == 1
+    assert result.candidates[0].external_id == "H-501"
+    assert result.artifacts[0].parser_version == "lgbs_property_sales_v1"
+    assert result.warnings == []
 
 
 def test_scraper_provider_raises_when_all_sources_fail() -> None:

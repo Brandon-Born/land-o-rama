@@ -53,6 +53,7 @@ def test_county_pull_validation_live_warning_pass(session_factory, tmp_path, mon
     monkeypatch.setenv("LANDORAMA_SCRAPER_ALLOWED_HOSTS", "")
     monkeypatch.setenv("LANDORAMA_SCRAPER_DOWNLOAD_DIR", str(tmp_path / "downloads"))
     monkeypatch.setenv("LANDORAMA_SCRAPER_REQUEST_INTERVAL_MS", "0")
+    monkeypatch.setenv("LANDORAMA_INGESTION_PRICE_CAP", "6000")
     with session_factory() as db:
         ensure_default_settings(db)
         db.get(ConfigKV, "mock_mode").value = "false"
@@ -68,6 +69,8 @@ def test_county_pull_validation_live_warning_pass(session_factory, tmp_path, mon
     assert report.counties[0].records_found >= 1
     assert report.counties[0].records_accepted == 0
     assert report.counties[0].status == "warning"
+    assert report.counties[0].availability_status == "success"
+    assert report.counties[0].yield_status == "warning"
 
 
 def test_county_pull_validation_live_strict_fails_on_warning(session_factory, tmp_path, monkeypatch) -> None:
@@ -87,6 +90,7 @@ def test_county_pull_validation_live_strict_fails_on_warning(session_factory, tm
     monkeypatch.setenv("LANDORAMA_SCRAPER_ALLOWED_HOSTS", "")
     monkeypatch.setenv("LANDORAMA_SCRAPER_DOWNLOAD_DIR", str(tmp_path / "downloads"))
     monkeypatch.setenv("LANDORAMA_SCRAPER_REQUEST_INTERVAL_MS", "0")
+    monkeypatch.setenv("LANDORAMA_INGESTION_PRICE_CAP", "6000")
     with session_factory() as db:
         ensure_default_settings(db)
         db.get(ConfigKV, "mock_mode").value = "false"
@@ -101,3 +105,55 @@ def test_county_pull_validation_live_strict_fails_on_warning(session_factory, tm
     )
     assert not report.passed
     assert "Strict mode failed because scraper warnings were present." in report.failure_reasons
+
+
+def test_county_pull_validation_live_yield_gate_fails_after_streak(session_factory, tmp_path, monkeypatch) -> None:
+    fixture = tmp_path / "county_live_yield_streak.csv"
+    _write_csv(
+        fixture,
+        [
+            "auction_id,parcel_key,county,state,price,acreage,source_url",
+            "H-20,PK-20,Hunt,TX,9000,0.3,https://example.test/auctions/H-20",
+        ],
+    )
+    monkeypatch.setenv("LANDORAMA_MOCK_MODE", "false")
+    monkeypatch.setenv("LANDORAMA_AUCTION_SOURCE_MODE", "scraper")
+    monkeypatch.setenv("LANDORAMA_SCRAPER_TARGET_COUNTIES", "hunt")
+    monkeypatch.setenv("LANDORAMA_SOURCE_CATALOG_PATH", "")
+    monkeypatch.setenv("LANDORAMA_SCRAPER_HUNT_SOURCE_URLS", str(fixture))
+    monkeypatch.setenv("LANDORAMA_SCRAPER_ALLOWED_HOSTS", "")
+    monkeypatch.setenv("LANDORAMA_SCRAPER_DOWNLOAD_DIR", str(tmp_path / "downloads"))
+    monkeypatch.setenv("LANDORAMA_SCRAPER_REQUEST_INTERVAL_MS", "0")
+    monkeypatch.setenv("LANDORAMA_INGESTION_PRICE_CAP", "6000")
+    monkeypatch.setenv("LANDORAMA_LIVE_YIELD_FAIL_STREAK", "3")
+    monkeypatch.setenv("LANDORAMA_LIVE_YIELD_LOOKBACK_RUNS", "5")
+    with session_factory() as db:
+        ensure_default_settings(db)
+        db.get(ConfigKV, "mock_mode").value = "false"
+        db.commit()
+
+    first = validate_county_pull(
+        mode="live",
+        counties=["hunt"],
+        session_factory=session_factory,
+        output_path=tmp_path / "county_live_yield_streak_1.json",
+    )
+    second = validate_county_pull(
+        mode="live",
+        counties=["hunt"],
+        session_factory=session_factory,
+        output_path=tmp_path / "county_live_yield_streak_2.json",
+    )
+    third = validate_county_pull(
+        mode="live",
+        counties=["hunt"],
+        session_factory=session_factory,
+        output_path=tmp_path / "county_live_yield_streak_3.json",
+    )
+
+    assert first.passed
+    assert second.passed
+    assert not third.passed
+    assert any(reason.startswith("Live yield gate failed:") for reason in third.failure_reasons)
+    assert third.counties[0].yield_status == "failed"
+    assert third.counties[0].yield_zero_accepted_streak >= 3
